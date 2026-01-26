@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="description" content="Runic Notes - A minimal text editor that lives in the URL">
+  <title>Runic Notes</title>
+  <style>
+    :root{
+      --bg:#0d0d0d;--bg2:#161b22;--bg3:#0d1117;
+      --border:#30363d;--border2:#21262d;
+      --text:#c9d1d9;--text2:#8b949e;--text3:#484f58;--text4:#6e7681;
+      --accent:#58a6ff;--accent2:#58a6ff40;
+      --warn:#f0883e;--err:#da3633;--ok:#238636;--ok2:#2ea043
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{height:100%;height:-webkit-fill-available}
+    body{min-height:100%;min-height:-webkit-fill-available;height:100dvh;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:var(--bg)}
+    main{position:fixed;inset:0;display:flex;flex-direction:column}
+    .skip{position:absolute;top:-40px;left:0;background:var(--accent);color:var(--bg);padding:8px 16px;z-index:1000;transition:top .2s}
+    .skip:focus{top:0}
+    #e{flex:1;width:100%;padding:1.25rem;padding-bottom:4rem;border:none;outline:none;resize:none;font-size:16px;line-height:1.7;background:var(--bg);color:var(--text);caret-color:var(--accent);cursor:text;-webkit-overflow-scrolling:touch}
+    #e::placeholder{color:var(--text3)}
+    #e::-webkit-scrollbar{width:6px;height:6px}
+    #e::-webkit-scrollbar-track{background:transparent}
+    #e::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    #e::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+    #bar{position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;padding-bottom:max(.75rem,env(safe-area-inset-bottom));font-size:11px;color:var(--text3);display:flex;gap:.5rem;align-items:center;justify-content:flex-end;background:linear-gradient(transparent,var(--bg) 30%);z-index:100}
+    #bar span:first-child{opacity:0;transition:opacity .2s;margin-right:auto}
+    #bar span.v{opacity:1}
+    .b{position:relative;background:var(--bg);border:1px solid var(--border);color:var(--text2);width:36px;height:36px;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
+    .b:hover,.b:focus{border-color:var(--accent);color:var(--accent);outline:none}
+    .b:focus-visible{box-shadow:0 0 0 2px var(--accent2)}
+    .b:active{transform:scale(.95)}
+    .b.on{border-color:var(--warn);color:var(--warn)}
+    .b.on:hover,.b.on:focus{border-color:var(--warn);color:var(--warn)}
+    @media(hover:hover){
+      .b[data-t]::after{content:attr(data-t);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--bg2);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px;white-space:nowrap;opacity:0;visibility:hidden;transition:all .15s;pointer-events:none;border:1px solid var(--border)}
+      .b[data-t]::before{content:'';position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--border);opacity:0;visibility:hidden;transition:all .15s}
+      .b[data-t]:hover::after,.b[data-t]:hover::before{opacity:1;visibility:visible}
+      .m .b::after,.m .b::before{display:none}
+    }
+    .m{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+    .m.v{display:flex}
+    .m>div{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:400px;width:100%}
+    .m h3{color:var(--text);font-size:15px;margin-bottom:1rem;font-weight:600}
+    .m input{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;margin-bottom:1rem;font-family:inherit;-webkit-appearance:none;appearance:none}
+    .m input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent2)}
+    .m .btns{display:flex;gap:.5rem;justify-content:flex-end}
+    .m .btns button{padding:10px 18px;border-radius:8px;font-size:13px;font-weight:500;min-height:44px}
+    .m .btns button:last-child{background:var(--ok);border-color:var(--ok);color:#fff}
+    .m .btns button:last-child:hover{background:var(--ok2);border-color:var(--ok2)}
+    #qm>div{max-width:340px;text-align:center;padding:1.75rem}
+    #qm h3{margin-bottom:1.5rem}
+    #qc{display:flex;flex-direction:column;align-items:center;gap:1rem}
+    #qc canvas{border-radius:12px;background:#fff;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+    #qu{color:var(--text4);font-size:10px;text-align:center;word-break:break-all;max-width:100%;padding:10px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border2);line-height:1.5;margin-top:.5rem}
+    #qm .btns{justify-content:center;gap:.75rem;margin-top:1.75rem;padding-top:1.25rem;border-top:1px solid var(--border2)}
+    #qm .btns button{min-width:110px;padding:12px 18px}
+    #enc{position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#1a1a2e,#16213e);padding:.75rem 1rem;padding-top:max(.75rem,env(safe-area-inset-top));display:none;align-items:center;justify-content:center;gap:1rem;font-size:12px;color:var(--warn);z-index:50}
+    #enc.v{display:flex}
+    #enc button{padding:8px 14px;font-size:12px;border-radius:6px;min-height:36px}
+    .ind{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;background:var(--warn)}
+    #ca{position:fixed;left:-9999px}
+    .vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    button:focus:not(:focus-visible){outline:none}
+    @media(max-width:480px){
+      #e{padding:1rem;padding-bottom:4.5rem}
+      #bar{gap:.375rem;padding:.625rem .75rem}
+      .b{width:40px;height:40px}
+      .m>div{padding:1.25rem;border-radius:16px}
+      .m h3{font-size:16px}
+      .m .btns{flex-direction:column-reverse}
+      .m .btns button{width:100%;justify-content:center}
+      #qm .btns{flex-direction:row}
+      #qm .btns button{width:auto;flex:1}
+    }
+    @media(max-height:500px){
+      #e{padding:.75rem 1rem;padding-bottom:3.5rem}
+      #bar{padding:.5rem .75rem}
+      .b{width:32px;height:32px}
+    }
+    @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+    @media(prefers-contrast:high){.b,.m>div{border-width:2px}}
+  </style>
+</head>
+<body>
+  <a href="#e" class="skip">Skip to editor</a>
+  <div id="enc" role="alert" aria-live="polite">
+    <span><span class="ind" aria-hidden="true"></span>This note is encrypted</span>
+    <button id="bd" type="button" class="b" style="width:auto;padding:0 12px" aria-label="Decrypt">🔑 Decrypt</button>
+  </div>
+  <main>
+    <label for="e" class="vh">Note editor</label>
+    <textarea id="e" placeholder="Start typing..." autofocus spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Note editor"></textarea>
+  </main>
+  <textarea id="ca" aria-hidden="true" tabindex="-1"></textarea>
+  <nav id="bar" aria-label="Actions">
+    <span id="st" role="status" aria-live="polite"></span>
+    <button id="bn" type="button" class="b" data-t="New (⌘N)" aria-label="New note">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2Z"/></svg>
+    </button>
+    <button id="bq" type="button" class="b" data-t="QR code" aria-label="QR code">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5V2a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM0 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM10 0a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-4Zm.5 1.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5Zm.5 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM9.5 10a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1ZM9 13.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1Zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Z"/></svg>
+    </button>
+    <button id="bc" type="button" class="b" data-t="Copy URL (⌘⇧C)" aria-label="Copy URL">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5Z"/></svg>
+    </button>
+    <button id="bl" type="button" class="b" data-t="Encrypt" aria-label="Encrypt">
+      <svg id="li" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+    </button>
+  </nav>
+  <div id="pm" class="m" role="dialog" aria-modal="true" aria-labelledby="pt">
+    <div>
+      <h3 id="pt">Enter password</h3>
+      <label for="pw" class="vh">Password</label>
+      <input type="password" id="pw" placeholder="Password" autocomplete="off">
+      <div class="btns">
+        <button id="pc" type="button" class="b" style="width:auto;padding:0 16px">Cancel</button>
+        <button id="po" type="button" class="b" style="width:auto;padding:0 16px">OK</button>
+      </div>
+    </div>
+  </div>
+  <div id="qm" class="m" role="dialog" aria-modal="true" aria-labelledby="qt">
+    <div>
+      <h3 id="qt">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-3px;margin-right:6px;opacity:.7"><path d="M0 2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5V2a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM0 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM10 0a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-4Zm.5 1.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5Zm.5 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM9.5 10a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1ZM9 13.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1Zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Z"/></svg>
+        Share via QR
+      </h3>
+      <div id="qc"><canvas id="qv" aria-label="QR code"></canvas><small id="qu"></small></div>
+      <div class="btns">
+        <button id="qd" type="button" class="b" style="width:auto;padding:0 16px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Save PNG
+        </button>
+        <button id="qx" type="button" class="b" style="width:auto;padding:0 16px">Done</button>
+      </div>
+    </div>
+  </div>
+  <div id="cm" class="m" role="alertdialog" aria-modal="true" aria-labelledby="ct" aria-describedby="cd">
+    <div>
+      <h3 id="ct">Create new note?</h3>
+      <p id="cd" style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:1.25rem">Current content will be lost.</p>
+      <div class="btns">
+        <button id="cc" type="button" class="b" style="width:auto;padding:0 16px">Cancel</button>
+        <button id="co" type="button" class="b" style="width:auto;padding:0 16px;background:var(--err);border-color:var(--err);color:#fff">Create new</button>
+      </div>
+    </div>
+  </div>
+  <script>
+const W=`const K="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";const R={};for(let i=0;i<64;i++)R[K[i]]=i;const L={c(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);for(let c of s){const wc=w+c;d.has(wc)?w=wc:(r.push(d.get(w)),d.set(wc,n++),w=c)}if(w)r.push(d.get(w));let o="",b=0,a=0;for(let v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=K[(b>>a)&63]}}if(a>0)o+=K[(b<<(6-a))&63];return o},d(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));let b=0,a=0,c=[];for(let ch of s){b=(b<<6)|R[ch];a+=6;while(a>=12){a-=12;c.push((b>>a)&4095)}}for(let i=0;i<c.length;i++){const k=c[i];let e=d.has(k)?d.get(k):w+w[0];r.push(e);if(w)d.set(n++,w+e[0]);w=e}return r.join("")}};const X={e(t,p){let r="";for(let i=0;i<t.length;i++)r+=String.fromCharCode(t.charCodeAt(i)^p.charCodeAt(i%p.length));return btoa(r).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=/g,"")},d(d,p){try{const b=atob(d.replace(/-/g,"+").replace(/_/g,"/"));let r="";for(let i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^p.charCodeAt(i%p.length));return r}catch{return null}}};self.onmessage=e=>{const{id,type,data,pw}=e.data;let r;if(type==="compress")r=L.c(data);else if(type==="decompress")r=L.d(data);else if(type==="encrypt")r=X.e(data,pw);else if(type==="decrypt")r=X.d(data,pw);self.postMessage({id,result:r})}`;
+const B=new Blob([W],{type:'application/javascript'}),U=URL.createObjectURL(B),w=new Worker(U);
+let mi=0;const P=new Map;
+w.onmessage=e=>{const{id,result}=e.data;const r=P.get(id);if(r){P.delete(id);r(result)}};
+const wc=(t,d,p)=>new Promise(r=>{const id=++mi;P.set(id,r);w.postMessage({id,type:t,data:d,pw:p})});
+const LZ={compress:s=>wc('compress',s),decompress:s=>wc('decompress',s)};
+const hc=typeof crypto!=='undefined'&&crypto.subtle;
+const Cr={
+  async encrypt(t,p){
+    if(!hc)return wc('encrypt',t,p);
+    const s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+    const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveKey']);
+    const ak=await crypto.subtle.deriveKey({name:'PBKDF2',salt:s,iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+    const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},ak,new TextEncoder().encode(t));
+    const r=new Uint8Array(s.length+iv.length+c.byteLength);
+    r.set(s,0);r.set(iv,s.length);r.set(new Uint8Array(c),s.length+iv.length);
+    return btoa(String.fromCharCode(...r)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  },
+  async decrypt(d,p){
+    if(!hc)return wc('decrypt',d,p);
+    try{
+      const b=Uint8Array.from(atob(d.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+      const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveKey']);
+      const ak=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b.slice(0,16),iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+      return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(16,28)},ak,b.slice(28)));
+    }catch{return null}
+  }
+};
+const DB={
+  db:null,
+  async init(){return new Promise((r,j)=>{const q=indexedDB.open('rn',1);q.onerror=()=>j(q.error);q.onsuccess=()=>{this.db=q.result;r()};q.onupgradeneeded=e=>{e.target.result.createObjectStore('n',{keyPath:'id'})}})},
+  async get(id){return new Promise((r,j)=>{const t=this.db.transaction('n','readonly').objectStore('n').get(id);t.onsuccess=()=>r(t.result);t.onerror=()=>j(t.error)})},
+  async set(id,d){return new Promise((r,j)=>{const t=this.db.transaction('n','readwrite').objectStore('n').put({id,...d});t.onsuccess=()=>r();t.onerror=()=>j(t.error)})}
+};
+const H=s=>{let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return Math.abs(h).toString(36).padStart(8,'0').slice(0,8)};
+let nid=null;
+const QR={
+  gen(t,sz=220){
+    const cv=$('qv'),cx=cv.getContext('2d');cv.width=sz;cv.height=sz;
+    const im=new Image;im.crossOrigin='anonymous';
+    im.onload=()=>cx.drawImage(im,0,0,sz,sz);
+    im.onerror=()=>{cx.fillStyle='#fff';cx.fillRect(0,0,sz,sz);cx.fillStyle='#000';cx.font='12px monospace';cx.textAlign='center';cx.fillText('Failed',sz/2,sz/2)};
+    im.src=`https://api.qrserver.com/v1/create-qr-code/?size=${sz}x${sz}&data=${encodeURIComponent(t)}`;
+    return cv;
+  }
+};
+const $=id=>document.getElementById(id);
+const e=$('e'),st=$('st'),bn=$('bn'),bq=$('bq'),bc=$('bc'),bl=$('bl'),bd=$('bd'),enc=$('enc');
+const pm=$('pm'),pt=$('pt'),pw=$('pw'),pc=$('pc'),po=$('po');
+const qm=$('qm'),qu=$('qu'),qd=$('qd'),qx=$('qx');
+const cm=$('cm'),cc=$('cc'),co=$('co'),ca=$('ca');
+let ie=false,nd=false,pa=null,ss=false,sv=0;
+const msg=(m,d=2000)=>{st.textContent=m;st.classList.add('v');setTimeout(()=>st.classList.remove('v'),d)};
+const fz=b=>b>=1048576?(b/1048576).toFixed(1)+'MB':b>=1024?(b/1024).toFixed(1)+'KB':b+'B';
+const bs=s=>new Blob([s]).size;
+const ut=t=>{const m=t.match(/^#\s*(.+)/m);document.title=m?m[1].slice(0,50):'Runic Notes'};
+const ue=()=>{
+  if(nd){enc.classList.add('v');e.style.paddingTop='calc(1.5rem + 36px)';e.disabled=true;e.placeholder='Enter password...';e.setAttribute('aria-disabled','true')}
+  else{enc.classList.remove('v');e.style.paddingTop='1.5rem';e.disabled=false;e.placeholder='Start typing...';e.removeAttribute('aria-disabled')}
+  const li=$('li');
+  if(ie){li.innerHTML='<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';bl.setAttribute('data-t','Remove encryption');bl.setAttribute('aria-label','Remove encryption')}
+  else{li.innerHTML='<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>';bl.setAttribute('data-t','Encrypt');bl.setAttribute('aria-label','Encrypt')}
+  bl.classList.toggle('on',ie);
+};
+const save=()=>{
+  if(ss||nd)return;ss=true;
+  const go=async()=>{
+    ss=false;const t=e.value,v=++sv;ut(t);
+    if(!t){history.replaceState(null,'',location.pathname);ie=false;nid=null;ue();return}
+    if(ie&&location.hash.startsWith('#!'))return;
+    const c=await LZ.compress(t);if(v!==sv)return;
+    const b=bs(t),ln=t.split('\n').length,ls=ln===1?' line':' lines';
+    if(c.length<2000){history.replaceState(null,'','#'+c);nid=null;msg(fz(b)+' · '+ln+ls)}
+    else{if(!nid)nid=H(t.slice(0,500)+t.length);await DB.set(nid,{text:t,ts:Date.now()});history.replaceState(null,'','#@'+nid);msg(fz(b)+' · local')}
+  };
+  window.requestIdleCallback?requestIdleCallback(()=>go(),{timeout:500}):setTimeout(go,150);
+};
+const load=async()=>{
+  await DB.init();const h=location.hash.slice(1);
+  if(!h){e.focus();return}
+  if(h.startsWith('!')){ie=true;nd=true;ue();return}
+  if(h.startsWith('@')){const id=h.slice(1);nid=id;const r=await DB.get(id);if(r){e.value=r.text;ut(r.text)}else msg('Not found');e.focus();return}
+  const t=await LZ.decompress(h);if(t){e.value=t;ut(t)}e.focus();
+};
+const cp=async t=>{
+  if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(t);return true}catch{}}
+  try{ca.value=t;ca.select();ca.setSelectionRange(0,99999);document.execCommand('copy');return true}catch{return false}
+};
+const cpUrl=async()=>{
+  const t=e.value;if(!t){msg('Nothing to copy');return}
+  let h;if(ie&&location.hash.startsWith('#!'))h=location.hash.slice(1);else h=await LZ.compress(t);
+  const url=location.origin+location.pathname+'#'+h;
+  if(await cp(url))msg('Copied · '+fz(bs(url)));else msg('Copy failed');
+};
+const pDec=()=>{pa='decrypt';pt.textContent='Enter decryption password';pm.classList.add('v');pw.focus()};
+const hEnc=async()=>{
+  if(nd){pDec();return}
+  if(ie){ie=false;ue();save();msg('Encryption removed');return}
+  if(!e.value){msg('Nothing to encrypt');return}
+  pa='encrypt';pt.textContent='Enter encryption password';pm.classList.add('v');pw.focus();
+};
+const hOk=async()=>{
+  const p=pw.value;if(!p)return;
+  try{
+    if(pa==='encrypt'){const x=await Cr.encrypt(e.value,p);history.replaceState(null,'','#!'+x);ie=true;nd=false;nid=null;ue();msg('Encrypted · '+fz(bs(x)))}
+    else if(pa==='decrypt'){const d=location.hash.slice(2),t=await Cr.decrypt(d,p);if(t){e.value=t;ut(t);ie=false;nd=false;ue();save();msg('Decrypted · '+fz(bs(t)));e.focus()}else{msg('Wrong password');pw.value='';pw.focus();return}}
+  }catch(x){msg('Error: '+x.message);return}
+  pm.classList.remove('v');pw.value='';pa=null;
+};
+const cMod=()=>{pm.classList.remove('v');pw.value='';pa=null;if(!nd)e.focus()};
+const newN=()=>{if(e.value){cm.classList.add('v');co.focus();return}mkNew()};
+const mkNew=()=>{e.value='';ie=false;nd=false;nid=null;history.replaceState(null,'',location.pathname);ue();ut('');cm.classList.remove('v');e.focus();msg('New note')};
+const cCM=()=>{cm.classList.remove('v');e.focus()};
+const shQr=async()=>{
+  const t=e.value;if(!t){msg('Nothing to share');return}
+  let url;if(ie&&!nd)url=location.origin+location.pathname+location.hash;else{const c=await LZ.compress(t);url=location.origin+location.pathname+'#'+c}
+  if(url.length>2000){msg('URL too long for QR');return}
+  qu.textContent=url.length>60?url.slice(0,60)+'...':url;QR.gen(url,220);qm.classList.add('v');
+};
+const dlQr=()=>{const cv=$('qv'),a=document.createElement('a');a.download='runic-note-qr.png';a.href=cv.toDataURL('image/png');a.click()};
+const cQM=()=>{qm.classList.remove('v');e.focus()};
+let it;e.addEventListener('input',()=>{clearTimeout(it);it=setTimeout(save,150)});
+bn.addEventListener('click',newN);bq.addEventListener('click',shQr);bc.addEventListener('click',cpUrl);bl.addEventListener('click',hEnc);bd.addEventListener('click',pDec);
+pc.addEventListener('click',cMod);po.addEventListener('click',hOk);pw.addEventListener('keydown',x=>{if(x.key==='Enter')hOk()});
+qd.addEventListener('click',dlQr);qx.addEventListener('click',cQM);
+cc.addEventListener('click',cCM);co.addEventListener('click',mkNew);
+document.addEventListener('keydown',x=>{
+  if(x.key==='Escape'){if(pm.classList.contains('v'))cMod();else if(qm.classList.contains('v'))cQM();else if(cm.classList.contains('v'))cCM()}
+  if((x.metaKey||x.ctrlKey)&&x.key==='n'){x.preventDefault();newN()}
+  if((x.metaKey||x.ctrlKey)&&x.shiftKey&&x.key==='c'){x.preventDefault();cpUrl()}
+});
+load();
+  </script>
+</body>
+</html>
