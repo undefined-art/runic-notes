@@ -3,285 +3,1312 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-  <meta name="theme-color" content="#0d0d0d">
+  <meta name="theme-color" content="#0d0d0d" id="theme-color-meta">
   <meta name="description" content="Runic Notes - A minimal text editor that lives in the URL">
   <title>Runic Notes</title>
   <style>
-    :root{
-      --bg:#0d0d0d;--bg2:#161b22;--bg3:#0d1117;
-      --border:#30363d;--border2:#21262d;
-      --text:#c9d1d9;--text2:#8b949e;--text3:#484f58;--text4:#6e7681;
-      --accent:#58a6ff;--accent2:#58a6ff40;
-      --warn:#f0883e;--err:#da3633;--ok:#238636;--ok2:#2ea043
+    :root {
+      --bg: #0d0d0d;
+      --bg2: #161b22;
+      --bg3: #0d1117;
+      --border: #30363d;
+      --border2: #21262d;
+      --text: #c9d1d9;
+      --text2: #8b949e;
+      --text3: #484f58;
+      --text4: #6e7681;
+      --accent: #58a6ff;
+      --accent2: #58a6ff40;
+      --warn: #f0883e;
+      --err: #da3633;
+      --ok: #238636;
+      --ok2: #2ea043;
+      --font-size: 16px
     }
-    *{margin:0;padding:0;box-sizing:border-box}
-    html{height:100%;height:-webkit-fill-available}
-    body{min-height:100%;min-height:-webkit-fill-available;height:100dvh;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:var(--bg)}
-    main{position:fixed;inset:0;display:flex;flex-direction:column}
-    .skip{position:absolute;top:-40px;left:0;background:var(--accent);color:var(--bg);padding:8px 16px;z-index:1000;transition:top .2s}
-    .skip:focus{top:0}
-    #e{flex:1;width:100%;padding:1.25rem;padding-bottom:4rem;border:none;outline:none;resize:none;font-size:16px;line-height:1.7;background:var(--bg);color:var(--text);caret-color:var(--accent);cursor:text;-webkit-overflow-scrolling:touch}
-    #e::placeholder{color:var(--text3)}
-    #e::-webkit-scrollbar{width:6px;height:6px}
-    #e::-webkit-scrollbar-track{background:transparent}
-    #e::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-    #e::-webkit-scrollbar-thumb:hover{background:var(--text3)}
-    #bar{position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;padding-bottom:max(.75rem,env(safe-area-inset-bottom));font-size:11px;color:var(--text3);display:flex;gap:.5rem;align-items:center;justify-content:flex-end;background:linear-gradient(transparent,var(--bg) 30%);z-index:100}
-    #bar span:first-child{opacity:0;transition:opacity .2s;margin-right:auto}
-    #bar span.v{opacity:1}
-    .b{position:relative;background:var(--bg);border:1px solid var(--border);color:var(--text2);width:36px;height:36px;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
-    .b:hover,.b:focus{border-color:var(--accent);color:var(--accent);outline:none}
-    .b:focus-visible{box-shadow:0 0 0 2px var(--accent2)}
-    .b:active{transform:scale(.95)}
-    .b.on{border-color:var(--warn);color:var(--warn)}
-    .b.on:hover,.b.on:focus{border-color:var(--warn);color:var(--warn)}
-    @media(hover:hover){
-      .b[data-t]::after{content:attr(data-t);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--bg2);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px;white-space:nowrap;opacity:0;visibility:hidden;transition:all .15s;pointer-events:none;border:1px solid var(--border)}
-      .b[data-t]::before{content:'';position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--border);opacity:0;visibility:hidden;transition:all .15s}
-      .b[data-t]:hover::after,.b[data-t]:hover::before{opacity:1;visibility:visible}
-      .m .b::after,.m .b::before{display:none}
+
+    [data-theme="light"] {
+      --bg: #ffffff;
+      --bg2: #f6f8fa;
+      --bg3: #f0f0f0;
+      --border: #d0d7de;
+      --border2: #d8dee4;
+      --text: #1f2328;
+      --text2: #656d76;
+      --text3: #8c959f;
+      --text4: #6e7781;
+      --accent: #0969da;
+      --accent2: #0969da40
     }
-    .m{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
-    .m.v{display:flex}
-    .m>div{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:400px;width:100%}
-    .m h3{color:var(--text);font-size:15px;margin-bottom:1rem;font-weight:600}
-    .m input{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;margin-bottom:1rem;font-family:inherit;-webkit-appearance:none;appearance:none}
-    .m input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent2)}
-    .m .btns{display:flex;gap:.5rem;justify-content:flex-end}
-    .m .btns button{padding:10px 18px;border-radius:8px;font-size:13px;font-weight:500;min-height:44px}
-    .m .btns button:last-child{background:var(--ok);border-color:var(--ok);color:#fff}
-    .m .btns button:last-child:hover{background:var(--ok2);border-color:var(--ok2)}
-    #qm>div{max-width:340px;text-align:center;padding:1.75rem}
-    #qm h3{margin-bottom:1.5rem}
-    #qc{display:flex;flex-direction:column;align-items:center;gap:1rem}
-    #qc canvas{border-radius:12px;background:#fff;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
-    #qu{color:var(--text4);font-size:10px;text-align:center;word-break:break-all;max-width:100%;padding:10px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border2);line-height:1.5;margin-top:.5rem}
-    #qm .btns{justify-content:center;gap:.75rem;margin-top:1.75rem;padding-top:1.25rem;border-top:1px solid var(--border2)}
-    #qm .btns button{min-width:110px;padding:12px 18px}
-    #enc{position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#1a1a2e,#16213e);padding:.75rem 1rem;padding-top:max(.75rem,env(safe-area-inset-top));display:none;align-items:center;justify-content:center;gap:1rem;font-size:12px;color:var(--warn);z-index:50}
-    #enc.v{display:flex}
-    #enc button{padding:8px 14px;font-size:12px;border-radius:6px;min-height:36px}
-    .ind{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;background:var(--warn)}
-    #ca{position:fixed;left:-9999px}
-    .vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-    :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-    button:focus:not(:focus-visible){outline:none}
-    @media(max-width:480px){
-      #e{padding:1rem;padding-bottom:4.5rem}
-      #bar{gap:.375rem;padding:.625rem .75rem}
-      .b{width:40px;height:40px}
-      .m>div{padding:1.25rem;border-radius:16px}
-      .m h3{font-size:16px}
-      .m .btns{flex-direction:column-reverse}
-      .m .btns button{width:100%;justify-content:center}
-      #qm .btns{flex-direction:row}
-      #qm .btns button{width:auto;flex:1}
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
     }
-    @media(max-height:500px){
-      #e{padding:.75rem 1rem;padding-bottom:3.5rem}
-      #bar{padding:.5rem .75rem}
-      .b{width:32px;height:32px}
+
+    html {
+      height: 100%;
+      height: -webkit-fill-available
     }
-    @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-    @media(prefers-contrast:high){.b,.m>div{border-width:2px}}
+
+    body {
+      min-height: 100%;
+      min-height: -webkit-fill-available;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: var(--bg);
+      transition: background .2s
+    }
+
+    main {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column
+    }
+
+    .skip {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background: var(--accent);
+      color: var(--bg);
+      padding: 8px 16px;
+      z-index: 1000;
+      transition: top .2s
+    }
+
+    .skip:focus {
+      top: 0
+    }
+
+    #e {
+      flex: 1;
+      width: 100%;
+      padding: 1.25rem;
+      padding-bottom: 4rem;
+      border: none;
+      outline: none;
+      resize: none;
+      font-size: var(--font-size);
+      line-height: 1.7;
+      background: var(--bg);
+      color: var(--text);
+      caret-color: var(--accent);
+      cursor: text;
+      -webkit-overflow-scrolling: touch;
+      transition: background .2s, color .2s, font-size .15s
+    }
+
+    #e::placeholder {
+      color: var(--text3)
+    }
+
+    #e::-webkit-scrollbar {
+      width: 6px;
+      height: 6px
+    }
+
+    #e::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    #e::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px
+    }
+
+    #e::-webkit-scrollbar-thumb:hover {
+      background: var(--text3)
+    }
+
+    #bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: .75rem 1rem;
+      padding-bottom: max(.75rem, env(safe-area-inset-bottom));
+      font-size: 11px;
+      color: var(--text3);
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+      justify-content: flex-end;
+      background: linear-gradient(transparent, var(--bg) 30%);
+      z-index: 100;
+      transition: background .2s
+    }
+
+    #stats {
+      margin-right: auto;
+      display: flex;
+      gap: 1rem;
+      color: var(--text4);
+      font-size: 10px
+    }
+
+    #st {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .2s, visibility .2s;
+      z-index: 150;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2)
+    }
+
+    #st.v {
+      opacity: 1;
+      visibility: visible
+    }
+
+    .b {
+      position: relative;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+      -webkit-tap-highlight-color: transparent;
+      text-decoration: none
+    }
+
+    .b:hover,
+    .b:focus {
+      border-color: var(--accent);
+      color: var(--accent);
+      outline: none
+    }
+
+    .b:focus-visible {
+      box-shadow: 0 0 0 2px var(--accent2)
+    }
+
+    .b:active {
+      transform: scale(.95)
+    }
+
+    .b.on {
+      border-color: var(--warn);
+      color: var(--warn)
+    }
+
+    .b.on:hover,
+    .b.on:focus {
+      border-color: var(--warn);
+      color: var(--warn)
+    }
+
+    .b.sm {
+      width: 28px;
+      height: 28px;
+      font-size: 12px
+    }
+
+    .sep {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      margin: 0 .25rem
+    }
+
+    @media(hover:hover) {
+      .b[data-t]::after {
+        content: attr(data-t);
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg2);
+        color: var(--text);
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: all .15s;
+        pointer-events: none;
+        border: 1px solid var(--border)
+      }
+
+      .b[data-t]::before {
+        content: '';
+        position: absolute;
+        bottom: calc(100% + 2px);
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: var(--border);
+        opacity: 0;
+        visibility: hidden;
+        transition: all .15s
+      }
+
+      .b[data-t]:hover::after,
+      .b[data-t]:hover::before {
+        opacity: 1;
+        visibility: visible
+      }
+
+      .m .b::after,
+      .m .b::before {
+        display: none
+      }
+    }
+
+    .m {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 1rem;
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px)
+    }
+
+    .m.v {
+      display: flex
+    }
+
+    .m>div {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 400px;
+      width: 100%
+    }
+
+    .m h3 {
+      color: var(--text);
+      font-size: 15px;
+      margin-bottom: 1rem;
+      font-weight: 600
+    }
+
+    .m input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 16px;
+      margin-bottom: 1rem;
+      font-family: inherit;
+      -webkit-appearance: none;
+      appearance: none
+    }
+
+    .m input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent2)
+    }
+
+    .m .btns {
+      display: flex;
+      gap: .5rem;
+      justify-content: flex-end
+    }
+
+    .m .btns button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      min-height: 44px
+    }
+
+    .m .btns button:last-child {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: #fff
+    }
+
+    .m .btns button:last-child:hover {
+      background: var(--ok2);
+      border-color: var(--ok2)
+    }
+
+    .pw-wrap {
+      position: relative
+    }
+
+    .pw-wrap input {
+      padding-right: 44px
+    }
+
+    .pw-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-top: -0.5rem;
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    .pw-toggle:hover {
+      color: var(--accent)
+    }
+
+    #qm>div {
+      max-width: 340px;
+      text-align: center;
+      padding: 1.75rem
+    }
+
+    #qm h3 {
+      margin-bottom: 1.5rem
+    }
+
+    #qc {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem
+    }
+
+    #qc canvas {
+      border-radius: 12px;
+      background: #fff;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .3)
+    }
+
+    #qu {
+      color: var(--text4);
+      font-size: 10px;
+      text-align: center;
+      word-break: break-all;
+      max-width: 100%;
+      padding: 10px 14px;
+      background: var(--bg3);
+      border-radius: 8px;
+      border: 1px solid var(--border2);
+      line-height: 1.5;
+      margin-top: .5rem
+    }
+
+    #qm .btns {
+      justify-content: center;
+      gap: .75rem;
+      margin-top: 1.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border2)
+    }
+
+    #qm .btns button {
+      min-width: 110px;
+      padding: 12px 18px
+    }
+
+    #enc {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(90deg, #1a1a2e, #16213e);
+      padding: .75rem 1rem;
+      padding-top: max(.75rem, env(safe-area-inset-top));
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      font-size: 12px;
+      color: var(--warn);
+      z-index: 50
+    }
+
+    #enc.v {
+      display: flex
+    }
+
+    #enc button {
+      padding: 8px 14px;
+      font-size: 12px;
+      border-radius: 6px;
+      min-height: 36px
+    }
+
+    .ind {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: var(--warn)
+    }
+
+    #ca {
+      position: fixed;
+      left: -9999px
+    }
+
+    .vh {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px
+    }
+
+    button:focus:not(:focus-visible) {
+      outline: none
+    }
+
+    #hm>div {
+      max-width: 500px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column
+    }
+
+    #hm h3 {
+      flex-shrink: 0
+    }
+
+    #hl {
+      flex: 1;
+      overflow-y: auto;
+      margin: -0.5rem;
+      padding: 0.5rem
+    }
+
+    .hi {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.625rem 0.75rem;
+      border-radius: 6px;
+      border-bottom: 1px solid var(--border2)
+    }
+
+    .hi:last-child {
+      border-bottom: none
+    }
+
+    .hi-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--bg3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text3);
+      flex-shrink: 0
+    }
+
+    .hi-icon.green {
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950
+    }
+
+    .hi-icon.blue {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent)
+    }
+
+    .hi-icon.yellow {
+      background: rgba(210, 153, 34, 0.15);
+      color: #d29922
+    }
+
+    .hi-icon.red {
+      background: rgba(248, 81, 73, 0.15);
+      color: #f85149
+    }
+
+    .hi-text {
+      flex: 1;
+      min-width: 0
+    }
+
+    .hi-action {
+      color: var(--text);
+      font-size: 12px
+    }
+
+    .hi-detail {
+      color: var(--text4);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px
+    }
+
+    .hi-time {
+      color: var(--text4);
+      font-size: 10px;
+      white-space: nowrap;
+      flex-shrink: 0
+    }
+
+    .hi-empty {
+      text-align: center;
+      color: var(--text3);
+      padding: 2rem
+    }
+
+    .drop-zone {
+      position: fixed;
+      inset: 0;
+      background: rgba(88, 166, 255, 0.1);
+      border: 3px dashed var(--accent);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      pointer-events: none
+    }
+
+    .drop-zone.v {
+      display: flex
+    }
+
+    .drop-zone span {
+      background: var(--bg2);
+      color: var(--accent);
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 500
+    }
+
+    @media(max-width:480px) {
+      #e {
+        padding: 1rem;
+        padding-bottom: 4.5rem
+      }
+
+      #st {
+        bottom: 80px;
+        font-size: 11px;
+        padding: 6px 12px
+      }
+
+      #bar {
+        gap: .375rem;
+        padding: .625rem .75rem;
+        flex-wrap: wrap
+      }
+
+      .b {
+        width: 40px;
+        height: 40px
+      }
+
+      .b.sm {
+        width: 32px;
+        height: 32px
+      }
+
+      #stats {
+        display: none
+      }
+
+      .sep {
+        display: none
+      }
+
+      .m>div {
+        padding: 1.25rem;
+        border-radius: 16px
+      }
+
+      .m h3 {
+        font-size: 16px
+      }
+
+      .m .btns {
+        flex-direction: column-reverse
+      }
+
+      .m .btns button {
+        width: 100%;
+        justify-content: center
+      }
+
+      #qm .btns {
+        flex-direction: row
+      }
+
+      #qm .btns button {
+        width: auto;
+        flex: 1
+      }
+    }
+
+    @media(max-height:500px) {
+      #e {
+        padding: .75rem 1rem;
+        padding-bottom: 3.5rem
+      }
+
+      #bar {
+        padding: .5rem .75rem
+      }
+
+      .b {
+        width: 32px;
+        height: 32px
+      }
+    }
+
+    @media(prefers-reduced-motion:reduce) {
+      * {
+        transition: none !important;
+        animation: none !important
+      }
+    }
+
+    @media(prefers-contrast:high) {
+      .b,
+      .m>div {
+        border-width: 2px
+      }
+    }
   </style>
 </head>
 <body>
   <a href="#e" class="skip">Skip to editor</a>
+  <div class="drop-zone" id="dropzone"><span>Drop .txt file here</span></div>
   <div id="enc" role="alert" aria-live="polite">
     <span><span class="ind" aria-hidden="true"></span>This note is encrypted</span>
     <button id="bd" type="button" class="b" style="width:auto;padding:0 12px" aria-label="Decrypt">🔑 Decrypt</button>
   </div>
   <main>
     <label for="e" class="vh">Note editor</label>
-    <textarea id="e" placeholder="Start typing..." autofocus spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Note editor"></textarea>
+    <textarea id="e" placeholder="Start typing..." autofocus spellcheck="false" autocomplete="off" autocorrect="off"
+      autocapitalize="off" aria-label="Note editor"></textarea>
   </main>
   <textarea id="ca" aria-hidden="true" tabindex="-1"></textarea>
+  <span id="st" role="status" aria-live="polite"></span>
   <nav id="bar" aria-label="Actions">
-    <span id="st" role="status" aria-live="polite"></span>
-    <button id="bn" type="button" class="b" data-t="New (⌘N)" aria-label="New note">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2Z"/></svg>
+    <div id="stats">
+      <span id="chars">0 chars</span>
+      <span id="words">0 words</span>
+      <span id="lines">0 lines</span>
+    </div>
+    <button id="bfs" type="button" class="b" data-t="Smaller font" aria-label="Decrease font size">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h14" />
+      </svg>
     </button>
+    <button id="bfl" type="button" class="b" data-t="Larger font" aria-label="Increase font size">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    </button>
+    <div class="sep"></div>
+    <button id="bn" type="button" class="b" data-t="New (⌘N)" aria-label="New note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="12" y1="18" x2="12" y2="12" />
+        <line x1="9" y1="15" x2="15" y2="15" />
+      </svg>
+    </button>
+    <button id="bh" type="button" class="b" data-t="Activity" aria-label="Activity log">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    </button>
+    <div class="sep"></div>
     <button id="bq" type="button" class="b" data-t="QR code" aria-label="QR code">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5V2a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM0 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM10 0a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-4Zm.5 1.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5Zm.5 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM9.5 10a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1ZM9 13.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1Zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Z"/></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path
+          d="M0 2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5V2a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM0 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM10 0a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-4Zm.5 1.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5Zm.5 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM9.5 10a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1ZM9 13.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1Zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Z" />
+      </svg>
     </button>
     <button id="bc" type="button" class="b" data-t="Copy URL (⌘⇧C)" aria-label="Copy URL">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5Z"/></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path
+          d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5Z" />
+        <path
+          d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25v-7.5Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5Z" />
+      </svg>
+    </button>
+    <button id="bs" type="button" class="b" data-t="Share" aria-label="Share">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+      </svg>
+    </button>
+    <button id="bdn" type="button" class="b" data-t="Download" aria-label="Download as .txt">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
     </button>
     <button id="bl" type="button" class="b" data-t="Encrypt" aria-label="Encrypt">
-      <svg id="li" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+      <svg id="li" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+      </svg>
     </button>
+    <div class="sep"></div>
+    <button id="bt" type="button" class="b" data-t="Theme" aria-label="Toggle theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="1" x2="12" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="23" />
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <line x1="1" y1="12" x2="3" y2="12" />
+        <line x1="21" y1="12" x2="23" y2="12" />
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </svg>
+    </button>
+    <a href="https://github.com/nicekismet/hash-note" target="_blank" rel="noopener noreferrer" class="b"
+      data-t="GitHub" aria-label="View on GitHub" tabindex="0">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path
+          d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+      </svg>
+    </a>
   </nav>
+
   <div id="pm" class="m" role="dialog" aria-modal="true" aria-labelledby="pt">
     <div>
       <h3 id="pt">Enter password</h3>
-      <label for="pw" class="vh">Password</label>
-      <input type="password" id="pw" placeholder="Password" autocomplete="off">
+      <div class="pw-wrap">
+        <label for="pw" class="vh">Password</label>
+        <input type="password" id="pw" placeholder="Password" autocomplete="off">
+        <button type="button" class="pw-toggle" id="pwt" aria-label="Show password">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+      </div>
+      <div class="pw-wrap" id="pw2w" style="display:none">
+        <label for="pw2" class="vh">Confirm password</label>
+        <input type="password" id="pw2" placeholder="Confirm password" autocomplete="off">
+        <button type="button" class="pw-toggle" id="pw2t" aria-label="Show password">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+      </div>
       <div class="btns">
         <button id="pc" type="button" class="b" style="width:auto;padding:0 16px">Cancel</button>
         <button id="po" type="button" class="b" style="width:auto;padding:0 16px">OK</button>
       </div>
     </div>
   </div>
+
   <div id="qm" class="m" role="dialog" aria-modal="true" aria-labelledby="qt">
     <div>
       <h3 id="qt">
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-3px;margin-right:6px;opacity:.7"><path d="M0 2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5V2a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM0 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM10 0a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-4Zm.5 1.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5Zm.5 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM9.5 10a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1ZM9 13.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1Zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Z"/></svg>
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"
+          style="vertical-align:-3px;margin-right:6px;opacity:.7">
+          <path
+            d="M0 2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5V2a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM0 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-4Zm2-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H2Zm1 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM10 0a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2h-4Zm.5 1.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5Zm.5 1a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1ZM9.5 10a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1ZM9 13.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1Zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1Z" />
+        </svg>
         Share via QR
       </h3>
       <div id="qc"><canvas id="qv" aria-label="QR code"></canvas><small id="qu"></small></div>
       <div class="btns">
         <button id="qd" type="button" class="b" style="width:auto;padding:0 16px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
           Save PNG
         </button>
         <button id="qx" type="button" class="b" style="width:auto;padding:0 16px">Done</button>
       </div>
     </div>
   </div>
+
   <div id="cm" class="m" role="alertdialog" aria-modal="true" aria-labelledby="ct" aria-describedby="cd">
     <div>
       <h3 id="ct">Create new note?</h3>
-      <p id="cd" style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:1.25rem">Current content will be lost.</p>
+      <p id="cd" style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:1.25rem">Current content will be
+        lost.</p>
       <div class="btns">
         <button id="cc" type="button" class="b" style="width:auto;padding:0 16px">Cancel</button>
-        <button id="co" type="button" class="b" style="width:auto;padding:0 16px;background:var(--err);border-color:var(--err);color:#fff">Create new</button>
+        <button id="co" type="button" class="b"
+          style="width:auto;padding:0 16px;background:var(--err);border-color:var(--err);color:#fff">Create new</button>
       </div>
     </div>
   </div>
+
+  <div id="hm" class="m" role="dialog" aria-modal="true" aria-labelledby="ht">
+    <div>
+      <h3 id="ht">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="vertical-align:-3px;margin-right:6px;opacity:.7">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        Activity
+      </h3>
+      <div id="hl" style="max-height:350px;overflow-y:auto"></div>
+      <div class="btns" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border2)">
+        <button id="hcl" type="button" class="b"
+          style="width:auto;padding:0 16px;background:var(--err);border-color:var(--err);color:#fff">Clear</button>
+        <button id="hx" type="button" class="b" style="width:auto;padding:0 16px">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-const W=`const K="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";const R={};for(let i=0;i<64;i++)R[K[i]]=i;const L={c(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);for(let c of s){const wc=w+c;d.has(wc)?w=wc:(r.push(d.get(w)),d.set(wc,n++),w=c)}if(w)r.push(d.get(w));let o="",b=0,a=0;for(let v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=K[(b>>a)&63]}}if(a>0)o+=K[(b<<(6-a))&63];return o},d(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));let b=0,a=0,c=[];for(let ch of s){b=(b<<6)|R[ch];a+=6;while(a>=12){a-=12;c.push((b>>a)&4095)}}for(let i=0;i<c.length;i++){const k=c[i];let e=d.has(k)?d.get(k):w+w[0];r.push(e);if(w)d.set(n++,w+e[0]);w=e}return r.join("")}};const X={e(t,p){let r="";for(let i=0;i<t.length;i++)r+=String.fromCharCode(t.charCodeAt(i)^p.charCodeAt(i%p.length));return btoa(r).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=/g,"")},d(d,p){try{const b=atob(d.replace(/-/g,"+").replace(/_/g,"/"));let r="";for(let i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^p.charCodeAt(i%p.length));return r}catch{return null}}};self.onmessage=e=>{const{id,type,data,pw}=e.data;let r;if(type==="compress")r=L.c(data);else if(type==="decompress")r=L.d(data);else if(type==="encrypt")r=X.e(data,pw);else if(type==="decrypt")r=X.d(data,pw);self.postMessage({id,result:r})}`;
-const B=new Blob([W],{type:'application/javascript'}),U=URL.createObjectURL(B),w=new Worker(U);
-let mi=0;const P=new Map;
-w.onmessage=e=>{const{id,result}=e.data;const r=P.get(id);if(r){P.delete(id);r(result)}};
-const wc=(t,d,p)=>new Promise(r=>{const id=++mi;P.set(id,r);w.postMessage({id,type:t,data:d,pw:p})});
-const LZ={compress:s=>wc('compress',s),decompress:s=>wc('decompress',s)};
-const hc=typeof crypto!=='undefined'&&crypto.subtle;
-const Cr={
-  async encrypt(t,p){
-    if(!hc)return wc('encrypt',t,p);
-    const s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
-    const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveKey']);
-    const ak=await crypto.subtle.deriveKey({name:'PBKDF2',salt:s,iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-    const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},ak,new TextEncoder().encode(t));
-    const r=new Uint8Array(s.length+iv.length+c.byteLength);
-    r.set(s,0);r.set(iv,s.length);r.set(new Uint8Array(c),s.length+iv.length);
-    return btoa(String.fromCharCode(...r)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-  },
-  async decrypt(d,p){
-    if(!hc)return wc('decrypt',d,p);
-    try{
-      const b=Uint8Array.from(atob(d.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
-      const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveKey']);
-      const ak=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b.slice(0,16),iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-      return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(16,28)},ak,b.slice(28)));
-    }catch{return null}
-  }
-};
-const DB={
-  db:null,
-  async init(){return new Promise((r,j)=>{const q=indexedDB.open('rn',1);q.onerror=()=>j(q.error);q.onsuccess=()=>{this.db=q.result;r()};q.onupgradeneeded=e=>{e.target.result.createObjectStore('n',{keyPath:'id'})}})},
-  async get(id){return new Promise((r,j)=>{const t=this.db.transaction('n','readonly').objectStore('n').get(id);t.onsuccess=()=>r(t.result);t.onerror=()=>j(t.error)})},
-  async set(id,d){return new Promise((r,j)=>{const t=this.db.transaction('n','readwrite').objectStore('n').put({id,...d});t.onsuccess=()=>r();t.onerror=()=>j(t.error)})}
-};
-const H=s=>{let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return Math.abs(h).toString(36).padStart(8,'0').slice(0,8)};
-let nid=null;
-const QR={
-  gen(t,sz=220){
-    const cv=$('qv'),cx=cv.getContext('2d');cv.width=sz;cv.height=sz;
-    const im=new Image;im.crossOrigin='anonymous';
-    im.onload=()=>cx.drawImage(im,0,0,sz,sz);
-    im.onerror=()=>{cx.fillStyle='#fff';cx.fillRect(0,0,sz,sz);cx.fillStyle='#000';cx.font='12px monospace';cx.textAlign='center';cx.fillText('Failed',sz/2,sz/2)};
-    im.src=`https://api.qrserver.com/v1/create-qr-code/?size=${sz}x${sz}&data=${encodeURIComponent(t)}`;
-    return cv;
-  }
-};
-const $=id=>document.getElementById(id);
-const e=$('e'),st=$('st'),bn=$('bn'),bq=$('bq'),bc=$('bc'),bl=$('bl'),bd=$('bd'),enc=$('enc');
-const pm=$('pm'),pt=$('pt'),pw=$('pw'),pc=$('pc'),po=$('po');
-const qm=$('qm'),qu=$('qu'),qd=$('qd'),qx=$('qx');
-const cm=$('cm'),cc=$('cc'),co=$('co'),ca=$('ca');
-let ie=false,nd=false,pa=null,ss=false,sv=0;
-const msg=(m,d=2000)=>{st.textContent=m;st.classList.add('v');setTimeout(()=>st.classList.remove('v'),d)};
-const fz=b=>b>=1048576?(b/1048576).toFixed(1)+'MB':b>=1024?(b/1024).toFixed(1)+'KB':b+'B';
-const bs=s=>new Blob([s]).size;
-const ut=t=>{const m=t.match(/^#\s*(.+)/m);document.title=m?m[1].slice(0,50):'Runic Notes'};
-const ue=()=>{
-  if(nd){enc.classList.add('v');e.style.paddingTop='calc(1.5rem + 36px)';e.disabled=true;e.placeholder='Enter password...';e.setAttribute('aria-disabled','true')}
-  else{enc.classList.remove('v');e.style.paddingTop='1.5rem';e.disabled=false;e.placeholder='Start typing...';e.removeAttribute('aria-disabled')}
-  const li=$('li');
-  if(ie){li.innerHTML='<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';bl.setAttribute('data-t','Remove encryption');bl.setAttribute('aria-label','Remove encryption')}
-  else{li.innerHTML='<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>';bl.setAttribute('data-t','Encrypt');bl.setAttribute('aria-label','Encrypt')}
-  bl.classList.toggle('on',ie);
-};
-const save=()=>{
-  if(ss||nd)return;ss=true;
-  const go=async()=>{
-    ss=false;const t=e.value,v=++sv;ut(t);
-    if(!t){history.replaceState(null,'',location.pathname);ie=false;nid=null;ue();return}
-    if(ie&&location.hash.startsWith('#!'))return;
-    const c=await LZ.compress(t);if(v!==sv)return;
-    const b=bs(t),ln=t.split('\n').length,ls=ln===1?' line':' lines';
-    if(c.length<2000){history.replaceState(null,'','#'+c);nid=null;msg(fz(b)+' · '+ln+ls)}
-    else{if(!nid)nid=H(t.slice(0,500)+t.length);await DB.set(nid,{text:t,ts:Date.now()});history.replaceState(null,'','#@'+nid);msg(fz(b)+' · local')}
-  };
-  window.requestIdleCallback?requestIdleCallback(()=>go(),{timeout:500}):setTimeout(go,150);
-};
-const load=async()=>{
-  await DB.init();const h=location.hash.slice(1);
-  if(!h){e.focus();return}
-  if(h.startsWith('!')){ie=true;nd=true;ue();return}
-  if(h.startsWith('@')){const id=h.slice(1);nid=id;const r=await DB.get(id);if(r){e.value=r.text;ut(r.text)}else msg('Not found');e.focus();return}
-  const t=await LZ.decompress(h);if(t){e.value=t;ut(t)}e.focus();
-};
-const cp=async t=>{
-  if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(t);return true}catch{}}
-  try{ca.value=t;ca.select();ca.setSelectionRange(0,99999);document.execCommand('copy');return true}catch{return false}
-};
-const cpUrl=async()=>{
-  const t=e.value;if(!t){msg('Nothing to copy');return}
-  let h;if(ie&&location.hash.startsWith('#!'))h=location.hash.slice(1);else h=await LZ.compress(t);
-  const url=location.origin+location.pathname+'#'+h;
-  if(await cp(url))msg('Copied · '+fz(bs(url)));else msg('Copy failed');
-};
-const pDec=()=>{pa='decrypt';pt.textContent='Enter decryption password';pm.classList.add('v');pw.focus()};
-const hEnc=async()=>{
-  if(nd){pDec();return}
-  if(ie){ie=false;ue();save();msg('Encryption removed');return}
-  if(!e.value){msg('Nothing to encrypt');return}
-  pa='encrypt';pt.textContent='Enter encryption password';pm.classList.add('v');pw.focus();
-};
-const hOk=async()=>{
-  const p=pw.value;if(!p)return;
-  try{
-    if(pa==='encrypt'){const x=await Cr.encrypt(e.value,p);history.replaceState(null,'','#!'+x);ie=true;nd=false;nid=null;ue();msg('Encrypted · '+fz(bs(x)))}
-    else if(pa==='decrypt'){const d=location.hash.slice(2),t=await Cr.decrypt(d,p);if(t){e.value=t;ut(t);ie=false;nd=false;ue();save();msg('Decrypted · '+fz(bs(t)));e.focus()}else{msg('Wrong password');pw.value='';pw.focus();return}}
-  }catch(x){msg('Error: '+x.message);return}
-  pm.classList.remove('v');pw.value='';pa=null;
-};
-const cMod=()=>{pm.classList.remove('v');pw.value='';pa=null;if(!nd)e.focus()};
-const newN=()=>{if(e.value){cm.classList.add('v');co.focus();return}mkNew()};
-const mkNew=()=>{e.value='';ie=false;nd=false;nid=null;history.replaceState(null,'',location.pathname);ue();ut('');cm.classList.remove('v');e.focus();msg('New note')};
-const cCM=()=>{cm.classList.remove('v');e.focus()};
-const shQr=async()=>{
-  const t=e.value;if(!t){msg('Nothing to share');return}
-  let url;if(ie&&!nd)url=location.origin+location.pathname+location.hash;else{const c=await LZ.compress(t);url=location.origin+location.pathname+'#'+c}
-  if(url.length>2000){msg('URL too long for QR');return}
-  qu.textContent=url.length>60?url.slice(0,60)+'...':url;QR.gen(url,220);qm.classList.add('v');
-};
-const dlQr=()=>{const cv=$('qv'),a=document.createElement('a');a.download='runic-note-qr.png';a.href=cv.toDataURL('image/png');a.click()};
-const cQM=()=>{qm.classList.remove('v');e.focus()};
-let it;e.addEventListener('input',()=>{clearTimeout(it);it=setTimeout(save,150)});
-bn.addEventListener('click',newN);bq.addEventListener('click',shQr);bc.addEventListener('click',cpUrl);bl.addEventListener('click',hEnc);bd.addEventListener('click',pDec);
-pc.addEventListener('click',cMod);po.addEventListener('click',hOk);pw.addEventListener('keydown',x=>{if(x.key==='Enter')hOk()});
-qd.addEventListener('click',dlQr);qx.addEventListener('click',cQM);
-cc.addEventListener('click',cCM);co.addEventListener('click',mkNew);
-document.addEventListener('keydown',x=>{
-  if(x.key==='Escape'){if(pm.classList.contains('v'))cMod();else if(qm.classList.contains('v'))cQM();else if(cm.classList.contains('v'))cCM()}
-  if((x.metaKey||x.ctrlKey)&&x.key==='n'){x.preventDefault();newN()}
-  if((x.metaKey||x.ctrlKey)&&x.shiftKey&&x.key==='c'){x.preventDefault();cpUrl()}
-});
-load();
+    const W = `const K="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";const R={};for(let i=0;i<64;i++)R[K[i]]=i;const L={c(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);for(let c of s){const wc=w+c;d.has(wc)?w=wc:(r.push(d.get(w)),d.set(wc,n++),w=c)}if(w)r.push(d.get(w));let o="",b=0,a=0;for(let v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=K[(b>>a)&63]}}if(a>0)o+=K[(b<<(6-a))&63];return o},d(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));let b=0,a=0,c=[];for(let ch of s){b=(b<<6)|R[ch];a+=6;while(a>=12){a-=12;c.push((b>>a)&4095)}}for(let i=0;i<c.length;i++){const k=c[i];let e=d.has(k)?d.get(k):w+w[0];r.push(e);if(w)d.set(n++,w+e[0]);w=e}return r.join("")}};const X={e(t,p){let r="";for(let i=0;i<t.length;i++)r+=String.fromCharCode(t.charCodeAt(i)^p.charCodeAt(i%p.length));return btoa(r).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=/g,"")},d(d,p){try{const b=atob(d.replace(/-/g,"+").replace(/_/g,"/"));let r="";for(let i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^p.charCodeAt(i%p.length));return r}catch{return null}}};self.onmessage=e=>{const{id,type,data,pw}=e.data;let r;if(type==="compress")r=L.c(data);else if(type==="decompress")r=L.d(data);else if(type==="encrypt")r=X.e(data,pw);else if(type==="decrypt")r=X.d(data,pw);self.postMessage({id,result:r})}`;
+    const B = new Blob([W], { type: 'application/javascript' }), U = URL.createObjectURL(B), w = new Worker(U);
+    let mi = 0; const P = new Map;
+    w.onmessage = e => { const { id, result } = e.data; const r = P.get(id); if (r) { P.delete(id); r(result) } };
+    const wc = (t, d, p) => new Promise(r => { const id = ++mi; P.set(id, r); w.postMessage({ id, type: t, data: d, pw: p }) });
+    const LZ = { compress: s => wc('compress', s), decompress: s => wc('decompress', s) };
+
+    const hc = typeof crypto !== 'undefined' && crypto.subtle;
+    const Cr = {
+      async encrypt(t, p) {
+        if (!hc) return wc('encrypt', t, p);
+        const s = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+        const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(p), 'PBKDF2', false, ['deriveKey']);
+        const ak = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: s, iterations: 100000, hash: 'SHA-256' }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        const c = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, ak, new TextEncoder().encode(t));
+        const r = new Uint8Array(s.length + iv.length + c.byteLength);
+        r.set(s, 0); r.set(iv, s.length); r.set(new Uint8Array(c), s.length + iv.length);
+        return btoa(String.fromCharCode(...r)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      },
+      async decrypt(d, p) {
+        if (!hc) return wc('decrypt', d, p);
+        try {
+          const b = Uint8Array.from(atob(d.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+          const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(p), 'PBKDF2', false, ['deriveKey']);
+          const ak = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b.slice(0, 16), iterations: 100000, hash: 'SHA-256' }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+          return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(16, 28) }, ak, b.slice(28)));
+        } catch { return null }
+      }
+    };
+
+    const DB = {
+      db: null,
+      async init() {
+        return new Promise((r, j) => {
+          const q = indexedDB.open('rn', 2);
+          q.onerror = () => j(q.error);
+          q.onsuccess = () => { this.db = q.result; r() };
+          q.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('n')) db.createObjectStore('n', { keyPath: 'id' });
+            if (!db.objectStoreNames.contains('h')) db.createObjectStore('h', { keyPath: 'id' });
+          }
+        })
+      },
+      async get(id) { return new Promise((r, j) => { const t = this.db.transaction('n', 'readonly').objectStore('n').get(id); t.onsuccess = () => r(t.result); t.onerror = () => j(t.error) }) },
+      async set(id, d) { return new Promise((r, j) => { const t = this.db.transaction('n', 'readwrite').objectStore('n').put({ id, ...d }); t.onsuccess = () => r(); t.onerror = () => j(t.error) }) },
+      async getHistory() {
+        return new Promise((r, j) => {
+          const t = this.db.transaction('h', 'readonly').objectStore('h').getAll();
+          t.onsuccess = () => r(t.result.sort((a, b) => b.ts - a.ts).slice(0, 50));
+          t.onerror = () => j(t.error);
+        })
+      },
+      async addHistory(action, detail = '') {
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        return new Promise(async (r, j) => {
+          const all = await this.getHistory();
+          if (all.length >= 50) {
+            const toDelete = all.slice(49);
+            const tx = this.db.transaction('h', 'readwrite');
+            const store = tx.objectStore('h');
+            toDelete.forEach(item => store.delete(item.id));
+          }
+          const t = this.db.transaction('h', 'readwrite').objectStore('h').put({ id, action, detail, ts: Date.now() });
+          t.onsuccess = () => r();
+          t.onerror = () => j(t.error);
+        })
+      },
+      async delHistory(id) {
+        return new Promise((r, j) => {
+          const t = this.db.transaction('h', 'readwrite').objectStore('h').delete(id);
+          t.onsuccess = () => r();
+          t.onerror = () => j(t.error);
+        })
+      },
+      async clearHistory() {
+        return new Promise((r, j) => {
+          const t = this.db.transaction('h', 'readwrite').objectStore('h').clear();
+          t.onsuccess = () => r();
+          t.onerror = () => j(t.error);
+        })
+      }
+    };
+
+    const H = s => { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0 } return Math.abs(h).toString(36).padStart(8, '0').slice(0, 8) };
+    let nid = null;
+    const log = (action, detail = '') => DB.addHistory(action, detail);
+
+    const QR = {
+      gen(t, sz = 220) {
+        const cv = $('qv'), cx = cv.getContext('2d'); cv.width = sz; cv.height = sz;
+        const im = new Image; im.crossOrigin = 'anonymous';
+        im.onload = () => cx.drawImage(im, 0, 0, sz, sz);
+        im.onerror = () => { cx.fillStyle = '#fff'; cx.fillRect(0, 0, sz, sz); cx.fillStyle = '#000'; cx.font = '12px monospace'; cx.textAlign = 'center'; cx.fillText('Failed', sz / 2, sz / 2) };
+        im.src = `https://api.qrserver.com/v1/create-qr-code/?size=${sz}x${sz}&data=${encodeURIComponent(t)}`;
+        return cv;
+      }
+    };
+
+    const $ = id => document.getElementById(id);
+    const e = $('e'), st = $('st'), bn = $('bn'), bq = $('bq'), bc = $('bc'), bl = $('bl'), bd = $('bd'), enc = $('enc');
+    const pm = $('pm'), pt = $('pt'), pw = $('pw'), pw2 = $('pw2'), pw2w = $('pw2w'), pc = $('pc'), po = $('po'), pwt = $('pwt'), pw2t = $('pw2t');
+    const qm = $('qm'), qu = $('qu'), qd = $('qd'), qx = $('qx');
+    const cm = $('cm'), cc = $('cc'), co = $('co'), ca = $('ca');
+    const hm = $('hm'), hl = $('hl'), hx = $('hx'), hcl = $('hcl'), bh = $('bh');
+    const bt = $('bt'), bs = $('bs'), bdn = $('bdn'), bfs = $('bfs'), bfl = $('bfl');
+    const dropzone = $('dropzone');
+    const chars = $('chars'), words = $('words'), lines = $('lines');
+
+    let ie = false, nd = false, pa = null, ss = false, sv = 0;
+    let fontSize = parseInt(localStorage.getItem('fontSize') || '16');
+    let theme = localStorage.getItem('theme') || 'dark';
+
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      $('theme-color-meta').content = '#ffffff';
+    }
+    document.documentElement.style.setProperty('--font-size', fontSize + 'px');
+
+    const msg = (m, d = 2000) => { st.textContent = m; st.classList.add('v'); setTimeout(() => st.classList.remove('v'), d) };
+    const fz = b => b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : b >= 1024 ? (b / 1024).toFixed(1) + 'KB' : b + 'B';
+    const bsz = s => new Blob([s]).size;
+    const ut = t => { const m = t.match(/^#\s*(.+)/m); document.title = m ? m[1].slice(0, 50) : 'Runic Notes' };
+
+    const updateStats = () => {
+      const t = e.value;
+      const c = t.length;
+      const w = t.trim() ? t.trim().split(/\s+/).length : 0;
+      const l = t.split('\n').length;
+      chars.textContent = c + ' chars';
+      words.textContent = w + ' words';
+      lines.textContent = l + ' lines';
+    };
+
+    const ue = () => {
+      if (nd) { enc.classList.add('v'); e.style.paddingTop = 'calc(1.5rem + 36px)'; e.disabled = true; e.placeholder = 'Enter password...'; e.setAttribute('aria-disabled', 'true') }
+      else { enc.classList.remove('v'); e.style.paddingTop = '1.5rem'; e.disabled = false; e.placeholder = 'Start typing...'; e.removeAttribute('aria-disabled') }
+      const li = $('li');
+      if (ie) { li.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'; bl.setAttribute('data-t', 'Remove encryption'); bl.setAttribute('aria-label', 'Remove encryption') }
+      else { li.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'; bl.setAttribute('data-t', 'Encrypt'); bl.setAttribute('aria-label', 'Encrypt') }
+      bl.classList.toggle('on', ie);
+    };
+
+    const save = () => {
+      if (ss || nd) return; ss = true;
+      const go = async () => {
+        ss = false; const t = e.value, v = ++sv; ut(t); updateStats();
+        if (!t) { history.replaceState(null, '', location.pathname); ie = false; nid = null; ue(); return }
+        if (ie && location.hash.startsWith('#!')) return;
+        const c = await LZ.compress(t); if (v !== sv) return;
+        const b = bsz(t), ln = t.split('\n').length, ls = ln === 1 ? ' line' : ' lines';
+
+        if (c.length < 2000) {
+          history.replaceState(null, '', '#' + c);
+          nid = null; msg(fz(b) + ' · ' + ln + ls)
+        }
+        else {
+          if (!nid) nid = H(t.slice(0, 500) + t.length);
+          await DB.set(nid, { text: t, ts: Date.now() });
+          history.replaceState(null, '', '#@' + nid);
+          msg(fz(b) + ' · local')
+        }
+      };
+      window.requestIdleCallback ? requestIdleCallback(() => go(), { timeout: 500 }) : setTimeout(go, 150);
+    };
+
+    const load = async () => {
+      await DB.init(); const h = location.hash.slice(1);
+      if (!h) { e.focus(); updateStats(); return }
+      if (h.startsWith('!')) { ie = true; nd = true; ue(); log('load', 'encrypted note'); return }
+      if (h.startsWith('@')) { const id = h.slice(1); nid = id; const r = await DB.get(id); if (r) { e.value = r.text; ut(r.text); log('load', 'from local storage'); } else msg('Not found'); e.focus(); updateStats(); return }
+      const t = await LZ.decompress(h); if (t) { e.value = t; ut(t); log('load', 'from URL'); } e.focus(); updateStats();
+    };
+
+    const cp = async t => {
+      if (navigator.clipboard?.writeText) { try { await navigator.clipboard.writeText(t); return true } catch { } }
+      try { ca.value = t; ca.select(); ca.setSelectionRange(0, 99999); document.execCommand('copy'); return true } catch { return false }
+    };
+
+    const cpUrl = async () => {
+      const t = e.value; if (!t) { msg('Nothing to copy'); return }
+      let h; if (ie && location.hash.startsWith('#!')) h = location.hash.slice(1); else h = await LZ.compress(t);
+      const url = location.origin + location.pathname + '#' + h;
+      if (await cp(url)) { msg('Copied · ' + fz(bsz(url))); log('copy', fz(bsz(url))); } else msg('Copy failed');
+    };
+
+    const download = () => {
+      const t = e.value;
+      if (!t) { msg('Nothing to download'); return }
+      const title = t.match(/^#\s*(.+)/m)?.[1]?.replace(/[^a-zA-Z0-9]/g, '-') || 'note';
+      const blob = new Blob([t], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = title + '.txt';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      msg('Downloaded');
+      log('download', title + '.txt');
+    };
+
+    const share = async () => {
+      const t = e.value;
+      if (!t) { msg('Nothing to share'); return }
+      if (!navigator.share) { cpUrl(); return }
+      const title = t.match(/^#\s*(.+)/m)?.[1] || 'Runic Note';
+      let h; if (ie && location.hash.startsWith('#!')) h = location.hash.slice(1); else h = await LZ.compress(t);
+      const url = location.origin + location.pathname + '#' + h;
+      try {
+        await navigator.share({ title, url });
+        msg('Shared');
+        log('share');
+      } catch (err) {
+        if (err.name !== 'AbortError') cpUrl();
+      }
+    };
+
+    const pDec = () => { pa = 'decrypt'; pt.textContent = 'Enter decryption password'; pw2w.style.display = 'none'; pm.classList.add('v'); pw.focus() };
+    const hEnc = async () => {
+      if (nd) { pDec(); return }
+      if (ie) { ie = false; ue(); save(); msg('Encryption removed'); return }
+      if (!e.value) { msg('Nothing to encrypt'); return }
+      pa = 'encrypt'; pt.textContent = 'Enter encryption password'; pw2w.style.display = 'block'; pm.classList.add('v'); pw.focus();
+    };
+    const hOk = async () => {
+      const p = pw.value; if (!p) return;
+      if (pa === 'encrypt' && pw.value !== pw2.value) { msg('Passwords do not match'); pw2.focus(); return }
+      try {
+        if (pa === 'encrypt') { const x = await Cr.encrypt(e.value, p); history.replaceState(null, '', '#!' + x); ie = true; nd = false; nid = null; ue(); msg('Encrypted · ' + fz(bsz(x))); log('encrypt', fz(bsz(x))); }
+        else if (pa === 'decrypt') { const d = location.hash.slice(2), t = await Cr.decrypt(d, p); if (t) { e.value = t; ut(t); ie = false; nd = false; ue(); save(); msg('Decrypted · ' + fz(bsz(t))); log('decrypt', fz(bsz(t))); e.focus() } else { msg('Wrong password'); pw.value = ''; pw.focus(); return } }
+      } catch (x) { msg('Error: ' + x.message); return }
+      pm.classList.remove('v'); pw.value = ''; pw2.value = ''; pa = null;
+    };
+    const cMod = () => { pm.classList.remove('v'); pw.value = ''; pw2.value = ''; pa = null; if (!nd) e.focus() };
+
+    const togglePw = (input, btn) => {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.innerHTML = isPassword
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    };
+    pwt.addEventListener('click', () => togglePw(pw, pwt));
+    pw2t.addEventListener('click', () => togglePw(pw2, pw2t));
+
+    const newN = () => { if (e.value) { cm.classList.add('v'); co.focus(); return } mkNew() };
+    const mkNew = () => { e.value = ''; ie = false; nd = false; nid = null; history.replaceState(null, '', location.pathname); ue(); ut(''); cm.classList.remove('v'); e.focus(); updateStats(); msg('New note'); log('new'); };
+    const cCM = () => { cm.classList.remove('v'); e.focus() };
+
+    const shQr = async () => {
+      const t = e.value; if (!t) { msg('Nothing to share'); return }
+      let url; if (ie && !nd) url = location.origin + location.pathname + location.hash; else { const c = await LZ.compress(t); url = location.origin + location.pathname + '#' + c }
+      if (url.length > 2000) { msg('URL too long for QR'); return }
+      qu.textContent = url.length > 60 ? url.slice(0, 60) + '...' : url; QR.gen(url, 220); qm.classList.add('v');
+      log('qr');
+    };
+    const dlQr = () => { const cv = $('qv'), a = document.createElement('a'); a.download = 'runic-note-qr.png'; a.href = cv.toDataURL('image/png'); a.click() };
+    const cQM = () => { qm.classList.remove('v'); e.focus() };
+
+    const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fmtTime = ts => {
+      const d = new Date(ts), now = new Date();
+      const diff = (now - d) / 1000;
+      if (diff < 60) return 'Just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      if (diff < 172800) return 'Yesterday';
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    };
+    const actionIcons = {
+      'new': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>', color: 'green' },
+      'save': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>', color: 'blue' },
+      'encrypt': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>', color: 'yellow' },
+      'decrypt': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>', color: 'green' },
+      'copy': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>', color: 'blue' },
+      'download': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', color: 'blue' },
+      'qr': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>', color: '' },
+      'import': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>', color: 'green' },
+      'share': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>', color: 'blue' },
+      'load': { icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>', color: '' }
+    };
+    const actionLabels = {
+      'new': 'New note created',
+      'save': 'Note saved',
+      'encrypt': 'Note encrypted',
+      'decrypt': 'Note decrypted',
+      'copy': 'URL copied',
+      'download': 'Note downloaded',
+      'qr': 'QR code generated',
+      'import': 'File imported',
+      'share': 'Note shared',
+      'load': 'Note loaded'
+    };
+    const showHistory = async () => {
+      const items = await DB.getHistory();
+      if (items.length === 0) {
+        hl.innerHTML = '<div class="hi-empty">No activity yet</div>';
+      } else {
+        hl.innerHTML = items.map(i => {
+          const ai = actionIcons[i.action] || actionIcons['save'];
+          return `
+          <div class="hi">
+            <div class="hi-icon ${ai.color}">${ai.icon}</div>
+            <div class="hi-text">
+              <div class="hi-action">${actionLabels[i.action] || i.action}</div>
+              ${i.detail ? `<div class="hi-detail">${escHtml(i.detail)}</div>` : ''}
+            </div>
+            <div class="hi-time">${fmtTime(i.ts)}</div>
+          </div>
+        `}).join('');
+      }
+      hm.classList.add('v');
+    };
+    hcl.addEventListener('click', async () => { await DB.clearHistory(); showHistory(); });
+    hx.addEventListener('click', () => { hm.classList.remove('v'); e.focus() });
+
+    const toggleTheme = () => {
+      theme = theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', theme);
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        $('theme-color-meta').content = '#ffffff';
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        $('theme-color-meta').content = '#0d0d0d';
+      }
+    };
+    bt.addEventListener('click', toggleTheme);
+
+    const changeFontSize = (delta) => {
+      fontSize = Math.max(12, Math.min(24, fontSize + delta));
+      localStorage.setItem('fontSize', fontSize);
+      document.documentElement.style.setProperty('--font-size', fontSize + 'px');
+    };
+    bfs.addEventListener('click', () => changeFontSize(-2));
+    bfl.addEventListener('click', () => changeFontSize(2));
+
+    const handleDrag = (ev) => {
+      ev.preventDefault();
+      dropzone.classList.add('v');
+    };
+    const handleDragLeave = () => {
+      dropzone.classList.remove('v');
+    };
+    const handleDrop = async (ev) => {
+      ev.preventDefault();
+      dropzone.classList.remove('v');
+      const file = ev.dataTransfer.files[0];
+      if (!file || !file.name.endsWith('.txt')) {
+        msg('Only .txt files supported');
+        return;
+      }
+      const text = await file.text();
+      e.value = text;
+      ut(text);
+      updateStats();
+      save();
+      msg('Imported ' + file.name);
+      log('import', file.name);
+    };
+    document.addEventListener('dragover', handleDrag);
+    document.addEventListener('dragleave', handleDragLeave);
+    document.addEventListener('drop', handleDrop);
+
+    let it; e.addEventListener('input', () => {
+      clearTimeout(it);
+      it = setTimeout(save, 150);
+      updateStats();
+    });
+
+    bn.addEventListener('click', newN);
+    bq.addEventListener('click', shQr);
+    bc.addEventListener('click', cpUrl);
+    bs.addEventListener('click', share);
+    bdn.addEventListener('click', download);
+    bl.addEventListener('click', hEnc);
+    bd.addEventListener('click', pDec);
+    bh.addEventListener('click', showHistory);
+    pc.addEventListener('click', cMod);
+    po.addEventListener('click', hOk);
+    pw.addEventListener('keydown', x => { if (x.key === 'Enter') { if (pa === 'encrypt') pw2.focus(); else hOk() } });
+    pw2.addEventListener('keydown', x => { if (x.key === 'Enter') hOk() });
+    qd.addEventListener('click', dlQr);
+    qx.addEventListener('click', cQM);
+    cc.addEventListener('click', cCM);
+    co.addEventListener('click', mkNew);
+
+    document.addEventListener('keydown', x => {
+      if (x.key === 'Escape') {
+        if (pm.classList.contains('v')) cMod();
+        else if (qm.classList.contains('v')) cQM();
+        else if (cm.classList.contains('v')) cCM();
+        else if (hm.classList.contains('v')) { hm.classList.remove('v'); e.focus() }
+      }
+      if ((x.metaKey || x.ctrlKey) && x.key === 'n') { x.preventDefault(); newN() }
+      if ((x.metaKey || x.ctrlKey) && x.shiftKey && x.key === 'c') { x.preventDefault(); cpUrl() }
+      if ((x.metaKey || x.ctrlKey) && x.key === 's') { x.preventDefault(); download() }
+    });
+
+    load();
   </script>
 </body>
 </html>
