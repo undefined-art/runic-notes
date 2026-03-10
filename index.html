@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none';">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta name="theme-color" content="#0d0d0d" id="theme-color-meta">
   <meta name="description" content="Runic Notes - A minimal text editor that lives in the URL">
@@ -910,87 +911,129 @@
   </div>
 
   <script>
-    const W = `const K="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";const R={};for(let i=0;i<64;i++)R[K[i]]=i;const L={c(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);for(let c of s){const wc=w+c;d.has(wc)?w=wc:(r.push(d.get(w)),d.set(wc,n++),w=c)}if(w)r.push(d.get(w));let o="",b=0,a=0;for(let v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=K[(b>>a)&63]}}if(a>0)o+=K[(b<<(6-a))&63];return o},d(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));let b=0,a=0,c=[];for(let ch of s){b=(b<<6)|R[ch];a+=6;while(a>=12){a-=12;c.push((b>>a)&4095)}}for(let i=0;i<c.length;i++){const k=c[i];let e=d.has(k)?d.get(k):w+w[0];r.push(e);if(w)d.set(n++,w+e[0]);w=e}return r.join("")}};const X={e(t,p){let r="";for(let i=0;i<t.length;i++)r+=String.fromCharCode(t.charCodeAt(i)^p.charCodeAt(i%p.length));return btoa(r).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=/g,"")},d(d,p){try{const b=atob(d.replace(/-/g,"+").replace(/_/g,"/"));let r="";for(let i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^p.charCodeAt(i%p.length));return r}catch{return null}}};self.onmessage=e=>{const{id,type,data,pw}=e.data;let r;if(type==="compress")r=L.c(data);else if(type==="decompress")r=L.d(data);else if(type==="encrypt")r=X.e(data,pw);else if(type==="decrypt")r=X.d(data,pw);self.postMessage({id,result:r})}`;
+    const W = `const K="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";const R={};for(let i=0;i<64;i++)R[K[i]]=i;const L={c(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);for(let c of s){const wc=w+c;d.has(wc)?w=wc:(r.push(d.get(w)),d.set(wc,n++),w=c)}if(w)r.push(d.get(w));let o="",b=0,a=0;for(let v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=K[(b>>a)&63]}}if(a>0)o+=K[(b<<(6-a))&63];return o},d(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));let b=0,a=0,c=[];for(let ch of s){b=(b<<6)|R[ch];a+=6;while(a>=12){a-=12;c.push((b>>a)&4095)}}for(let i=0;i<c.length;i++){const k=c[i];let e=d.has(k)?d.get(k):w+w[0];r.push(e);if(w)d.set(n++,w+e[0]);w=e}return r.join("")}};self.onmessage=e=>{const{id,type,data}=e.data;let r;if(type==="compress")r=L.c(data);else if(type==="decompress")r=L.d(data);self.postMessage({id,result:r})}`;
     const B = new Blob([W], { type: 'application/javascript' }), U = URL.createObjectURL(B), w = new Worker(U);
     let mi = 0; const P = new Map;
-    w.onmessage = e => { const { id, result } = e.data; const r = P.get(id); if (r) { P.delete(id); r(result) } };
-    const wc = (t, d, p) => new Promise(r => { const id = ++mi; P.set(id, r); w.postMessage({ id, type: t, data: d, pw: p }) });
+    w.onmessage = ev => { const { id, result } = ev.data; const resolve = P.get(id); if (resolve) { P.delete(id); resolve(result) } };
+    w.onerror = () => { P.forEach(resolve => resolve(null)); P.clear() };
+    const wc = (t, d) => new Promise(r => { const id = ++mi; P.set(id, r); w.postMessage({ id, type: t, data: d }) });
     const LZ = { compress: s => wc('compress', s), decompress: s => wc('decompress', s) };
 
-    const hc = typeof crypto !== 'undefined' && crypto.subtle;
+    const PBKDF2_ITERATIONS = 600000;
+
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+      throw new Error('Web Crypto API is not available. Please use a modern browser (Chrome 79+, Firefox 51+, Safari 10+).');
+    }
+
+    const u8ToBase64url = bytes => {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    };
+
     const Cr = {
       async encrypt(t, p) {
-        if (!hc) return wc('encrypt', t, p);
-        const s = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-        const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(p), 'PBKDF2', false, ['deriveKey']);
-        const ak = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: s, iterations: 100000, hash: 'SHA-256' }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-        const c = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, ak, new TextEncoder().encode(t));
-        const r = new Uint8Array(s.length + iv.length + c.byteLength);
-        r.set(s, 0); r.set(iv, s.length); r.set(new Uint8Array(c), s.length + iv.length);
-        return btoa(String.fromCharCode(...r)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const rawKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(p), 'PBKDF2', false, ['deriveKey']);
+        const aesKey = await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+          rawKey,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt', 'decrypt']
+        );
+        const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, new TextEncoder().encode(t));
+        const result = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+        result.set(salt, 0);
+        result.set(iv, salt.length);
+        result.set(new Uint8Array(ciphertext), salt.length + iv.length);
+        return u8ToBase64url(result);
       },
       async decrypt(d, p) {
-        if (!hc) return wc('decrypt', d, p);
         try {
-          const b = Uint8Array.from(atob(d.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-          const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(p), 'PBKDF2', false, ['deriveKey']);
-          const ak = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b.slice(0, 16), iterations: 100000, hash: 'SHA-256' }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-          return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(16, 28) }, ak, b.slice(28)));
+          const bytes = Uint8Array.from(atob(d.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+          const rawKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(p), 'PBKDF2', false, ['deriveKey']);
+          const aesKey = await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: bytes.slice(0, 16), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+            rawKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+          );
+          return new TextDecoder().decode(
+            await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(16, 28) }, aesKey, bytes.slice(28))
+          );
         } catch { return null }
       }
     };
 
+    const randomId = () => {
+      const bytes = crypto.getRandomValues(new Uint8Array(6));
+      return Date.now().toString(36) + Array.from(bytes, b => b.toString(36)).join('').slice(0, 6);
+    };
+
+    const HISTORY_LIMIT = 50;
+
     const DB = {
       db: null,
-      async init() {
-        return new Promise((r, j) => {
-          const q = indexedDB.open('rn', 2);
-          q.onerror = () => j(q.error);
-          q.onsuccess = () => { this.db = q.result; r() };
-          q.onupgradeneeded = e => {
-            const db = e.target.result;
+      init() {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open('rn', 2);
+          req.onerror = () => reject(req.error);
+          req.onsuccess = () => { this.db = req.result; resolve() };
+          req.onupgradeneeded = ev => {
+            const db = ev.target.result;
             if (!db.objectStoreNames.contains('n')) db.createObjectStore('n', { keyPath: 'id' });
             if (!db.objectStoreNames.contains('h')) db.createObjectStore('h', { keyPath: 'id' });
-          }
-        })
+          };
+        });
       },
-      async get(id) { return new Promise((r, j) => { const t = this.db.transaction('n', 'readonly').objectStore('n').get(id); t.onsuccess = () => r(t.result); t.onerror = () => j(t.error) }) },
-      async set(id, d) { return new Promise((r, j) => { const t = this.db.transaction('n', 'readwrite').objectStore('n').put({ id, ...d }); t.onsuccess = () => r(); t.onerror = () => j(t.error) }) },
-      async getHistory() {
-        return new Promise((r, j) => {
-          const t = this.db.transaction('h', 'readonly').objectStore('h').getAll();
-          t.onsuccess = () => r(t.result.sort((a, b) => b.ts - a.ts).slice(0, 50));
-          t.onerror = () => j(t.error);
-        })
+      get(id) {
+        return new Promise((resolve, reject) => {
+          const req = this.db.transaction('n', 'readonly').objectStore('n').get(id);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
       },
-      async addHistory(action, detail = '') {
-        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        return new Promise(async (r, j) => {
-          const all = await this.getHistory();
-          if (all.length >= 50) {
-            const toDelete = all.slice(49);
-            const tx = this.db.transaction('h', 'readwrite');
-            const store = tx.objectStore('h');
-            toDelete.forEach(item => store.delete(item.id));
-          }
-          const t = this.db.transaction('h', 'readwrite').objectStore('h').put({ id, action, detail, ts: Date.now() });
-          t.onsuccess = () => r();
-          t.onerror = () => j(t.error);
-        })
+      set(id, data) {
+        return new Promise((resolve, reject) => {
+          const req = this.db.transaction('n', 'readwrite').objectStore('n').put({ id, ...data });
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
       },
-      async delHistory(id) {
-        return new Promise((r, j) => {
-          const t = this.db.transaction('h', 'readwrite').objectStore('h').delete(id);
-          t.onsuccess = () => r();
-          t.onerror = () => j(t.error);
-        })
+      getHistory() {
+        return new Promise((resolve, reject) => {
+          const req = this.db.transaction('h', 'readonly').objectStore('h').getAll();
+          req.onsuccess = () => resolve(req.result.sort((a, b) => b.ts - a.ts).slice(0, HISTORY_LIMIT));
+          req.onerror = () => reject(req.error);
+        });
       },
-      async clearHistory() {
-        return new Promise((r, j) => {
-          const t = this.db.transaction('h', 'readwrite').objectStore('h').clear();
-          t.onsuccess = () => r();
-          t.onerror = () => j(t.error);
-        })
+      addHistory(action, detail = '') {
+        const id = randomId();
+        const entry = { id, action, detail, ts: Date.now() };
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction('h', 'readwrite');
+          const store = tx.objectStore('h');
+          const getAllReq = store.getAll();
+          getAllReq.onsuccess = () => {
+            const all = getAllReq.result.sort((a, b) => b.ts - a.ts);
+            if (all.length >= HISTORY_LIMIT) {
+              all.slice(HISTORY_LIMIT - 1).forEach(item => store.delete(item.id));
+            }
+            store.put(entry);
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      },
+      clearHistory() {
+        return new Promise((resolve, reject) => {
+          const req = this.db.transaction('h', 'readwrite').objectStore('h').clear();
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
       }
     };
 
@@ -998,16 +1041,239 @@
     let nid = null;
     const log = (action, detail = '') => DB.addHistory(action, detail);
 
-    const QR = {
-      gen(t, sz = 220) {
-        const cv = $('qv'), cx = cv.getContext('2d'); cv.width = sz; cv.height = sz;
-        const im = new Image; im.crossOrigin = 'anonymous';
-        im.onload = () => cx.drawImage(im, 0, 0, sz, sz);
-        im.onerror = () => { cx.fillStyle = '#fff'; cx.fillRect(0, 0, sz, sz); cx.fillStyle = '#000'; cx.font = '12px monospace'; cx.textAlign = 'center'; cx.fillText('Failed', sz / 2, sz / 2) };
-        im.src = `https://api.qrserver.com/v1/create-qr-code/?size=${sz}x${sz}&data=${encodeURIComponent(t)}`;
-        return cv;
-      }
-    };
+    // Minimal QR Code generator — fully client-side, no external requests.
+    // Based on the public-domain qrcodejs algorithm (MIT).
+    const QR = (() => {
+      const GF = new Uint8Array(512), GFI = new Uint8Array(256);
+      let x = 1;
+      for (let i = 0; i < 255; i++) { GF[i] = x; GFI[x] = i; x <<= 1; if (x & 256) x ^= 285; }
+      for (let i = 255; i < 512; i++) GF[i] = GF[i - 255];
+
+      const gfMul = (a, b) => a && b ? GF[GFI[a] + GFI[b]] : 0;
+
+      const rsGen = (n) => {
+        let g = [1];
+        for (let i = 0; i < n; i++) {
+          const ng = new Array(g.length + 1).fill(0);
+          for (let j = 0; j < g.length; j++) { ng[j] ^= g[j]; ng[j + 1] ^= gfMul(g[j], GF[i]); }
+          g = ng;
+        }
+        return g;
+      };
+
+      const rsEncode = (data, n) => {
+        const g = rsGen(n), res = new Uint8Array(n);
+        for (let i = 0; i < data.length; i++) {
+          const c = data[i] ^ res[0];
+          for (let j = 0; j < n - 1; j++) res[j] = res[j + 1] ^ gfMul(c, g[n - 1 - j]);
+          res[n - 1] = gfMul(c, g[0]);
+        }
+        return res;
+      };
+
+      // QR version 1-10 capacity table [version][ecLevel]: [dataCodewords, ecCodewords, blocks]
+      // ecLevel: 0=L,1=M,2=Q,3=H
+      const CAP = [
+        null,
+        [[19,7,1],[16,10,1],[13,13,1],[9,17,1]],
+        [[34,10,1],[28,16,1],[22,22,1],[16,28,1]],
+        [[55,15,1],[44,26,1],[34,18,2],[26,22,2]],
+        [[80,20,2],[64,18,2],[48,26,4],[36,16,4]],
+        [[108,26,2],[86,24,2],[62,18,2],[46,22,2]],
+        [[136,18,4],[108,16,4],[76,24,4],[60,28,4]],
+        [[156,20,4],[124,18,4],[88,18,6],[66,26,6]],
+        [[194,24,2],[154,22,2],[110,22,6],[86,26,6]],
+        [[232,30,3],[182,22,3],[132,20,8],[100,24,8]],
+        [[274,18,4],[216,26,4],[154,24,8],[122,28,8]]
+      ];
+
+      const ALIGN = [null,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+
+      const FORMAT_INFO = [
+        [0x77c4,0x72f3,0x7daa,0x789d,0x662f,0x6318,0x6c41,0x6976],
+        [0x5412,0x5125,0x5e7c,0x5b4b,0x45f9,0x40ce,0x4f97,0x4aa0],
+        [0x355f,0x3068,0x3f31,0x3a06,0x24b4,0x2183,0x2eda,0x2bed],
+        [0x1689,0x13be,0x1ce7,0x19d0,0x0762,0x0255,0x0d0c,0x083b]
+      ];
+
+      const makeMatrix = (ver) => {
+        const n = ver * 4 + 17;
+        return Array.from({ length: n }, () => new Int8Array(n).fill(-1));
+      };
+
+      const setFinder = (m, r, c) => {
+        for (let i = -1; i <= 7; i++) for (let j = -1; j <= 7; j++) {
+          if (r + i < 0 || r + i >= m.length || c + j < 0 || c + j >= m.length) continue;
+          m[r + i][c + j] = (i >= 0 && i <= 6 && j >= 0 && j <= 6 &&
+            ((i === 0 || i === 6 || j === 0 || j === 6) || (i >= 2 && i <= 4 && j >= 2 && j <= 4))) ? 1 : 0;
+        }
+      };
+
+      const setAlign = (m, r, c) => {
+        for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++)
+          m[r + i][c + j] = (i === -2 || i === 2 || j === -2 || j === 2 || (i === 0 && j === 0)) ? 1 : 0;
+      };
+
+      const setTiming = (m, n) => {
+        for (let i = 8; i < n - 8; i++) { m[6][i] = i % 2 === 0 ? 1 : 0; m[i][6] = i % 2 === 0 ? 1 : 0; }
+      };
+
+      const setFormat = (m, n, ecLevel, mask) => {
+        const f = FORMAT_INFO[ecLevel][mask];
+        const bits = [
+          (f >> 14) & 1, (f >> 13) & 1, (f >> 12) & 1, (f >> 11) & 1, (f >> 10) & 1,
+          (f >> 9) & 1, (f >> 8) & 1, (f >> 7) & 1, (f >> 6) & 1, (f >> 5) & 1,
+          (f >> 4) & 1, (f >> 3) & 1, (f >> 2) & 1, (f >> 1) & 1, f & 1
+        ];
+        const pos = [0,1,2,3,4,5,7,8];
+        for (let i = 0; i < 6; i++) { m[8][pos[i]] = bits[i]; m[pos[i]][8] = bits[14 - i]; }
+        m[8][7] = bits[6]; m[7][8] = bits[8];
+        m[8][8] = bits[7]; m[n - 8][8] = bits[7];
+        for (let i = 0; i < 7; i++) { m[8][n - 7 + i] = bits[i]; m[n - 7 + i][8] = bits[14 - i]; }
+      };
+
+      const applyMask = (m, n, mask) => {
+        const fns = [
+          (r, c) => (r + c) % 2 === 0,
+          (r) => r % 2 === 0,
+          (r, c) => c % 3 === 0,
+          (r, c) => (r + c) % 3 === 0,
+          (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+          (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+          (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
+          (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0
+        ];
+        const fn = fns[mask];
+        for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+          if (m[r][c] !== -1 && m[r][c] < 2) m[r][c] ^= fn(r, c) ? 1 : 0;
+      };
+
+      const penalty = (m, n) => {
+        let p = 0;
+        for (let r = 0; r < n; r++) {
+          let run = 1;
+          for (let c = 1; c < n; c++) {
+            if (m[r][c] === m[r][c - 1]) { run++; if (run === 5) p += 3; else if (run > 5) p++; }
+            else run = 1;
+          }
+        }
+        for (let c = 0; c < n; c++) {
+          let run = 1;
+          for (let r = 1; r < n; r++) {
+            if (m[r][c] === m[r - 1][c]) { run++; if (run === 5) p += 3; else if (run > 5) p++; }
+            else run = 1;
+          }
+        }
+        return p;
+      };
+
+      const encode = (text) => {
+        const bytes = new TextEncoder().encode(text);
+        const len = bytes.length;
+        let ver = 1, ecLevel = 0;
+        for (let v = 1; v <= 10; v++) {
+          if (CAP[v][ecLevel][0] >= len + 3) { ver = v; break; }
+          if (v === 10) return null;
+        }
+        const [dataCW, ecCW, blocks] = CAP[ver][ecLevel];
+        const n = ver * 4 + 17;
+
+        const data = new Uint8Array(dataCW);
+        let pos = 0;
+        data[pos++] = 0x40 | (len >> 4);
+        data[pos++] = ((len & 0xf) << 4) | (bytes[0] >> 4);
+        for (let i = 1; i < len; i++) {
+          data[pos++] = ((bytes[i - 1] & 0xf) << 4) | (bytes[i] >> 4);
+        }
+        if (pos < dataCW) data[pos++] = (bytes[len - 1] & 0xf) << 4;
+        const pad = [0xec, 0x11];
+        for (let i = 0; pos < dataCW; i++) data[pos++] = pad[i % 2];
+
+        const blockSize = Math.floor(dataCW / blocks);
+        const extra = dataCW % blocks;
+        const allData = [], allEc = [];
+        let off = 0;
+        for (let b = 0; b < blocks; b++) {
+          const blen = blockSize + (b < extra ? 1 : 0);
+          const bd = data.slice(off, off + blen);
+          allData.push(bd);
+          allEc.push(rsEncode(bd, ecCW));
+          off += blen;
+        }
+
+        const codewords = [];
+        const maxLen = Math.max(...allData.map(d => d.length));
+        for (let i = 0; i < maxLen; i++) allData.forEach(d => { if (i < d.length) codewords.push(d[i]); });
+        for (let i = 0; i < ecCW; i++) allEc.forEach(ec => codewords.push(ec[i]));
+
+        const m = makeMatrix(ver);
+        setFinder(m, 0, 0); setFinder(m, 0, n - 7); setFinder(m, n - 7, 0);
+        setTiming(m, n);
+        m[n - 8][8] = 1;
+        const ap = ALIGN[ver];
+        for (let i = 0; i < ap.length; i++) for (let j = 0; j < ap.length; j++) {
+          if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) continue;
+          setAlign(m, ap[i], ap[j]);
+        }
+        for (let r = 0; r < n; r++) { m[r][8] = m[r][8] === -1 ? -2 : m[r][8]; m[8][r] = m[8][r] === -1 ? -2 : m[8][r]; }
+        setFormat(m, n, ecLevel, 0);
+
+        let bi = 0, boff = 7;
+        for (let c = n - 1; c > 0; c -= 2) {
+          if (c === 6) c--;
+          for (let rr = 0; rr < n; rr++) {
+            const r = (Math.floor((n - 1 - c) / 2) % 2 === 0) ? n - 1 - rr : rr;
+            for (let cc = 0; cc < 2; cc++) {
+              const col = c - cc;
+              if (m[r][col] === -1) {
+                const bit = bi < codewords.length ? (codewords[bi] >> boff) & 1 : 0;
+                m[r][col] = bit;
+                boff--;
+                if (boff < 0) { boff = 7; bi++; }
+              }
+            }
+          }
+        }
+
+        let bestMask = 0, bestPenalty = Infinity;
+        for (let mask = 0; mask < 8; mask++) {
+          const mc = m.map(row => Int8Array.from(row));
+          applyMask(mc, n, mask);
+          setFormat(mc, n, ecLevel, mask);
+          const p = penalty(mc, n);
+          if (p < bestPenalty) { bestPenalty = p; bestMask = mask; }
+        }
+        applyMask(m, n, bestMask);
+        setFormat(m, n, ecLevel, bestMask);
+        return m;
+      };
+
+      return {
+        gen(text, sz = 220) {
+          const cv = document.getElementById('qv');
+          const cx = cv.getContext('2d');
+          cv.width = sz; cv.height = sz;
+          cx.fillStyle = '#fff';
+          cx.fillRect(0, 0, sz, sz);
+          const matrix = encode(text);
+          if (!matrix) {
+            cx.fillStyle = '#000';
+            cx.font = '12px monospace';
+            cx.textAlign = 'center';
+            cx.fillText('URL too long', sz / 2, sz / 2);
+            return cv;
+          }
+          const n = matrix.length;
+          const pad = Math.floor(sz * 0.05);
+          const cell = (sz - pad * 2) / n;
+          cx.fillStyle = '#000';
+          for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+            if (matrix[r][c] & 1) cx.fillRect(pad + c * cell, pad + r * cell, cell, cell);
+          }
+          return cv;
+        }
+      };
+    })();
 
     const $ = id => document.getElementById(id);
     const e = $('e'), st = $('st'), bn = $('bn'), bq = $('bq'), bc = $('bc'), bl = $('bl'), bd = $('bd'), enc = $('enc');
@@ -1019,7 +1285,7 @@
     const dropzone = $('dropzone');
     const chars = $('chars'), words = $('words'), lines = $('lines');
 
-    let ie = false, nd = false, pa = null, ss = false, sv = 0;
+    let ie = false, nd = false, pa = null, sv = 0;
     let fontSize = parseInt(localStorage.getItem('fontSize') || '16');
     let theme = localStorage.getItem('theme') || 'dark';
 
@@ -1034,14 +1300,18 @@
     const bsz = s => new Blob([s]).size;
     const ut = t => { const m = t.match(/^#\s*(.+)/m); document.title = m ? m[1].slice(0, 50) : 'Runic Notes' };
 
+    let statsTimer;
     const updateStats = () => {
-      const t = e.value;
-      const c = t.length;
-      const w = t.trim() ? t.trim().split(/\s+/).length : 0;
-      const l = t.split('\n').length;
-      chars.textContent = c + ' chars';
-      words.textContent = w + ' words';
-      lines.textContent = l + ' lines';
+      clearTimeout(statsTimer);
+      statsTimer = setTimeout(() => {
+        const t = e.value;
+        const c = t.length;
+        const wc = t.trim() ? t.trim().split(/\s+/).length : 0;
+        const l = t.split('\n').length;
+        chars.textContent = c + ' chars';
+        words.textContent = wc + ' words';
+        lines.textContent = l + ' lines';
+      }, 100);
     };
 
     const ue = () => {
@@ -1054,34 +1324,52 @@
     };
 
     const save = () => {
-      if (ss || nd) return; ss = true;
+      if (nd) return;
       const go = async () => {
-        ss = false; const t = e.value, v = ++sv; ut(t); updateStats();
+        const t = e.value, v = ++sv;
+        ut(t);
         if (!t) { history.replaceState(null, '', location.pathname); ie = false; nid = null; ue(); return }
         if (ie && location.hash.startsWith('#!')) return;
-        const c = await LZ.compress(t); if (v !== sv) return;
+        const c = await LZ.compress(t);
+        if (v !== sv) return;
         const b = bsz(t), ln = t.split('\n').length, ls = ln === 1 ? ' line' : ' lines';
-
         if (c.length < 2000) {
           history.replaceState(null, '', '#' + c);
-          nid = null; msg(fz(b) + ' · ' + ln + ls)
-        }
-        else {
+          nid = null; msg(fz(b) + ' · ' + ln + ls);
+        } else {
           if (!nid) nid = H(t.slice(0, 500) + t.length);
           await DB.set(nid, { text: t, ts: Date.now() });
           history.replaceState(null, '', '#@' + nid);
-          msg(fz(b) + ' · local')
+          msg(fz(b) + ' · local');
         }
       };
       window.requestIdleCallback ? requestIdleCallback(() => go(), { timeout: 500 }) : setTimeout(go, 150);
     };
 
     const load = async () => {
-      await DB.init(); const h = location.hash.slice(1);
+      try {
+        await DB.init();
+      } catch {
+        msg('Storage unavailable. Notes will not be saved locally.', 4000);
+      }
+      const h = location.hash.slice(1);
       if (!h) { e.focus(); updateStats(); return }
       if (h.startsWith('!')) { ie = true; nd = true; ue(); log('load', 'encrypted note'); return }
-      if (h.startsWith('@')) { const id = h.slice(1); nid = id; const r = await DB.get(id); if (r) { e.value = r.text; ut(r.text); log('load', 'from local storage'); } else msg('Not found'); e.focus(); updateStats(); return }
-      const t = await LZ.decompress(h); if (t) { e.value = t; ut(t); log('load', 'from URL'); } e.focus(); updateStats();
+      if (h.startsWith('@')) {
+        const id = h.slice(1);
+        nid = id;
+        try {
+          const r = await DB.get(id);
+          if (r) { e.value = r.text; ut(r.text); log('load', 'from local storage'); }
+          else msg('Note not found in local storage');
+        } catch { msg('Failed to load note from local storage'); }
+        e.focus(); updateStats(); return;
+      }
+      try {
+        const t = await LZ.decompress(h);
+        if (t) { e.value = t; ut(t); log('load', 'from URL'); }
+      } catch { msg('Failed to decompress note from URL'); }
+      e.focus(); updateStats();
     };
 
     const cp = async t => {
@@ -1139,7 +1427,7 @@
       try {
         if (pa === 'encrypt') { const x = await Cr.encrypt(e.value, p); history.replaceState(null, '', '#!' + x); ie = true; nd = false; nid = null; ue(); msg('Encrypted · ' + fz(bsz(x))); log('encrypt', fz(bsz(x))); }
         else if (pa === 'decrypt') { const d = location.hash.slice(2), t = await Cr.decrypt(d, p); if (t) { e.value = t; ut(t); ie = false; nd = false; ue(); save(); msg('Decrypted · ' + fz(bsz(t))); log('decrypt', fz(bsz(t))); e.focus() } else { msg('Wrong password'); pw.value = ''; pw.focus(); return } }
-      } catch (x) { msg('Error: ' + x.message); return }
+      } catch { msg('Encryption error. Please try again.'); return }
       pm.classList.remove('v'); pw.value = ''; pw2.value = ''; pa = null;
     };
     const cMod = () => { pm.classList.remove('v'); pw.value = ''; pw2.value = ''; pa = null; if (!nd) e.focus() };
@@ -1213,7 +1501,7 @@
           <div class="hi">
             <div class="hi-icon ${ai.color}">${ai.icon}</div>
             <div class="hi-text">
-              <div class="hi-action">${actionLabels[i.action] || i.action}</div>
+              <div class="hi-action">${escHtml(actionLabels[i.action] || i.action)}</div>
               ${i.detail ? `<div class="hi-detail">${escHtml(i.detail)}</div>` : ''}
             </div>
             <div class="hi-time">${fmtTime(i.ts)}</div>
@@ -1273,9 +1561,10 @@
     document.addEventListener('dragleave', handleDragLeave);
     document.addEventListener('drop', handleDrop);
 
-    let it; e.addEventListener('input', () => {
-      clearTimeout(it);
-      it = setTimeout(save, 150);
+    let saveTimer;
+    e.addEventListener('input', () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(save, 150);
       updateStats();
     });
 

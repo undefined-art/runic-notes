@@ -1,82 +1,74 @@
-# Runic Notes ✎
+# Runic Notes
 
-A minimal, privacy-focused text editor that lives in the URL. No server, no database — your notes are stored directly in the link.
+Runic Notes is a simple text editor that stores your note directly in the URL. Your browser keeps the data locally, so the note stays only with you and the person who opens the link.
 
 ![Preview](.github/preview.webp)
 
 ## Features
 
 ### Core
-- **URL Storage** — Notes are compressed and stored in the URL hash
-- **Local Storage** — Large notes automatically saved to IndexedDB
-- **Encryption** — AES-GCM encryption with password protection
-- **QR Codes** — Share notes via scannable QR codes
+
+- Your note can live directly in the URL, so you can share it with a single link.  
+- Short notes are compressed and stored in the URL hash.  
+- Large notes are saved locally in IndexedDB on your device.  
+- You can protect a note with a password using AES-GCM encryption.  
+- You can generate a QR code and share the note by scanning it.
 
 ### Sharing
-- **Copy URL** — One-click copy shareable link (⌘/Ctrl+Shift+C)
-- **Web Share** — Native sharing on mobile devices
-- **Download** — Export notes as .txt files (⌘/Ctrl+S)
-- **Drag & Drop** — Import .txt files by dropping
+
+- You can copy a shareable link with one shortcut: Ctrl or Cmd + Shift + C.  
+- Mobile devices can use the native share menu of the browser.  
+- You can download the note as a .txt file with Ctrl or Cmd + S.  
+- You can drag and drop a .txt file into the editor to import it.
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `⌘/Ctrl + N` | New note |
-| `⌘/Ctrl + S` | Download as .txt |
-| `⌘/Ctrl + Shift + C` | Copy URL |
-| `Escape` | Close modal |
+| `⌘/Ctrl + N` | Create a new note |
+| `⌘/Ctrl + S` | Download the note as a .txt file |
+| `⌘/Ctrl + Shift + C` | Copy the note URL |
+| `Escape` | Close an open modal window |
 
 ## Privacy & Security
 
-- **Zero Server** — No data ever leaves your browser
-- **End-to-End Encryption** — AES-256-GCM with PBKDF2 key derivation
-- **No Tracking** — No analytics, no cookies, no telemetry
-- **Open Source** — Fully auditable code
+Runic Notes keeps everything inside your browser.
+
+- No data leaves your device while you write or read a note.  
+- Encrypted notes use AES-256-GCM with PBKDF2 for key derivation.  
+- There are no trackers, analytics scripts, cookies, or telemetry.  
+- The code is open source, so anyone can inspect how it works.
 
 ## How It Works
 
-1. **Small notes** (< 2KB compressed) are stored entirely in the URL hash
-2. **Large notes** are saved to IndexedDB with a short reference ID in the URL
-3. **Encrypted notes** use the `#!` prefix and require a password to decrypt
+Small notes stay completely inside the link.
+
+If the compressed text is smaller than about 2KB, the whole note is stored in the URL hash. The browser reads the hash and restores the text. If the note grows larger, the editor saves it to IndexedDB on your device.  
+The link then contains a short reference ID that points to that local data.
+
+Encrypted notes start with the `#!` prefix. When someone opens such a link, the editor asks for the password and decrypts the text locally.
 
 ## Tech Stack
 
-- Vanilla JavaScript (no dependencies)
-- LZW compression for URL storage
-- Web Crypto API for encryption
-- IndexedDB for local storage
+- Vanilla JavaScript with no external dependencies  
+- LZW compression to fit notes inside the URL  
+- Web Crypto API for encryption and decryption  
+- IndexedDB for local storage of larger notes
 
 ## Browser Support
 
-Works in all modern browsers:
-- Chrome/Edge 79+
-- Firefox 51+
-- Safari 10+
-- Opera (except Mini)
+Runic Notes works in modern browsers.
+
+- Chrome and Edge 79 and newer  
+- Firefox 51 and newer  
+- Safari 10 and newer  
+- Opera works as well, except Opera Mini
 
 ## Installation
 
 ### Self-hosted
+
 ```bash
 git clone https://github.com/undefined-art/runic-notes.git
 cd runic-notes
 python -m http.server 8000
-```
-
-## Useful commands
-
-```bash
-# Check file sizes after minification
-ls -lh index.html index.min.html
-
-# Check gzipped size
-gzip -c index.min.html | wc -c
-
-# Minify and check size
-npx html-minifier --collapse-whitespace --remove-comments --minify-css true --minify-js true index.html -o index.min.html && ls -lh index.min.html
-```
-
----
-
-Built because sometimes you just want to share text without creating an account.
