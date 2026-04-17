@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; manifest-src 'none'; media-src 'none'; font-src 'none'; child-src blob:;">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta name="theme-color" content="#0d0d0d" id="theme-color-meta">
   <meta name="description" content="Runic Notes - A minimal text editor that lives in the URL">
+  <meta name="color-scheme" content="dark light">
   <title>Runic Notes</title>
   <style>
     :root {
@@ -104,6 +108,10 @@
 
     #e::placeholder {
       color: var(--text3)
+    }
+
+    #e.locked {
+      padding-top: calc(1.25rem + 36px)
     }
 
     #e::-webkit-scrollbar {
@@ -911,13 +919,97 @@
   </div>
 
   <script>
-    const W = `const K="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";const R={};for(let i=0;i<64;i++)R[K[i]]=i;const L={c(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);for(let c of s){const wc=w+c;d.has(wc)?w=wc:(r.push(d.get(w)),d.set(wc,n++),w=c)}if(w)r.push(d.get(w));let o="",b=0,a=0;for(let v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=K[(b>>a)&63]}}if(a>0)o+=K[(b<<(6-a))&63];return o},d(s){if(!s)return"";const d=new Map;let n=256,w="",r=[];for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));let b=0,a=0,c=[];for(let ch of s){b=(b<<6)|R[ch];a+=6;while(a>=12){a-=12;c.push((b>>a)&4095)}}for(let i=0;i<c.length;i++){const k=c[i];let e=d.has(k)?d.get(k):w+w[0];r.push(e);if(w)d.set(n++,w+e[0]);w=e}return r.join("")}};self.onmessage=e=>{const{id,type,data}=e.data;let r;if(type==="compress")r=L.c(data);else if(type==="decompress")r=L.d(data);self.postMessage({id,result:r})}`;
-    const B = new Blob([W], { type: 'application/javascript' }), U = URL.createObjectURL(B), w = new Worker(U);
-    let mi = 0; const P = new Map;
-    w.onmessage = ev => { const { id, result } = ev.data; const resolve = P.get(id); if (resolve) { P.delete(id); resolve(result) } };
-    w.onerror = () => { P.forEach(resolve => resolve(null)); P.clear() };
-    const wc = (t, d) => new Promise(r => { const id = ++mi; P.set(id, r); w.postMessage({ id, type: t, data: d }) });
-    const LZ = { compress: s => wc('compress', s), decompress: s => wc('decompress', s) };
+    // LZW over UTF-8 bytes (mapped 1:1 to Latin-1 code units so the classic
+    // string-based dictionary keeps working). Dictionary is capped at 12-bit
+    // (4096 entries) to match the packing width. ASCII output is byte-identical
+    // to the previous implementation, so existing URLs stay valid.
+    const W = `
+const A="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const R=Object.create(null);for(let i=0;i<64;i++)R[A[i]]=i;
+const te=new TextEncoder();const td=new TextDecoder("utf-8",{fatal:false});
+const toL=s=>{const b=te.encode(s);let o="";for(let i=0;i<b.length;i++)o+=String.fromCharCode(b[i]);return o};
+const fromL=s=>{const b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return td.decode(b)};
+const MAX=4096;
+const L={
+  c(s){
+    if(!s)return"";
+    const src=toL(s);
+    const d=new Map;
+    for(let i=0;i<256;i++)d.set(String.fromCharCode(i),i);
+    let n=256,w="",r=[];
+    for(const c of src){
+      const wc=w+c;
+      if(d.has(wc))w=wc;
+      else{r.push(d.get(w));if(n<MAX)d.set(wc,n++);w=c}
+    }
+    if(w!=="")r.push(d.get(w));
+    let o="",b=0,a=0;
+    for(const v of r){b=(b<<12)|v;a+=12;while(a>=6){a-=6;o+=A[(b>>a)&63]}}
+    if(a>0)o+=A[(b<<(6-a))&63];
+    return o;
+  },
+  d(s){
+    if(!s)return"";
+    const d=new Map;
+    for(let i=0;i<256;i++)d.set(i,String.fromCharCode(i));
+    let b=0,a=0;const codes=[];
+    for(let i=0;i<s.length;i++){
+      const idx=R[s[i]];
+      if(idx===undefined)return"";
+      b=(b<<6)|idx;a+=6;
+      while(a>=12){a-=12;codes.push((b>>a)&4095)}
+    }
+    if(codes.length===0)return"";
+    let n=256,w="",r=[];
+    for(let i=0;i<codes.length;i++){
+      const k=codes[i];
+      let e;
+      if(d.has(k))e=d.get(k);
+      else if(k===n&&w!=="")e=w+w[0];
+      else return"";
+      r.push(e);
+      if(w!==""&&n<MAX)d.set(n++,w+e[0]);
+      w=e;
+    }
+    return fromL(r.join(""));
+  }
+};
+self.onmessage=ev=>{
+  const{id,type,data}=ev.data;
+  try{
+    const result=type==="compress"?L.c(data):type==="decompress"?L.d(data):null;
+    self.postMessage({id,result});
+  }catch(e){
+    self.postMessage({id,result:null,error:String(e&&e.message||e)});
+  }
+};
+`;
+    const workerBlob = new Blob([W], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const worker = new Worker(workerUrl);
+    URL.revokeObjectURL(workerUrl);
+    let msgId = 0;
+    const pending = new Map();
+    worker.onmessage = ev => {
+      const { id, result } = ev.data;
+      const handler = pending.get(id);
+      if (!handler) return;
+      pending.delete(id);
+      handler(result);
+    };
+    worker.onerror = () => {
+      pending.forEach(handler => handler(null));
+      pending.clear();
+    };
+    const workerCall = (type, data) => new Promise(resolve => {
+      const id = ++msgId;
+      pending.set(id, resolve);
+      worker.postMessage({ id, type, data });
+    });
+    const LZ = {
+      compress: s => workerCall('compress', s),
+      decompress: s => workerCall('decompress', s)
+    };
 
     const PBKDF2_ITERATIONS = 600000;
 
@@ -969,8 +1061,22 @@
     };
 
     const randomId = () => {
-      const bytes = crypto.getRandomValues(new Uint8Array(6));
-      return Date.now().toString(36) + Array.from(bytes, b => b.toString(36)).join('').slice(0, 6);
+      if (typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+      }
+      const bytes = crypto.getRandomValues(new Uint8Array(8));
+      let out = '';
+      for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
+      return out;
+    };
+
+    const safeStorage = {
+      get(key, fallback = null) {
+        try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, value); } catch { /* private mode / quota */ }
+      }
     };
 
     const HISTORY_LIMIT = 50;
@@ -1011,18 +1117,21 @@
         });
       },
       addHistory(action, detail = '') {
-        const id = randomId();
-        const entry = { id, action, detail, ts: Date.now() };
+        if (!this.db) return Promise.resolve();
+        const entry = { id: randomId(), action, detail: String(detail || '').slice(0, 200), ts: Date.now() };
         return new Promise((resolve, reject) => {
           const tx = this.db.transaction('h', 'readwrite');
           const store = tx.objectStore('h');
-          const getAllReq = store.getAll();
-          getAllReq.onsuccess = () => {
-            const all = getAllReq.result.sort((a, b) => b.ts - a.ts);
-            if (all.length >= HISTORY_LIMIT) {
-              all.slice(HISTORY_LIMIT - 1).forEach(item => store.delete(item.id));
-            }
-            store.put(entry);
+          store.put(entry);
+          const countReq = store.count();
+          countReq.onsuccess = () => {
+            const overflow = countReq.result - HISTORY_LIMIT;
+            if (overflow <= 0) return;
+            const req = store.getAll();
+            req.onsuccess = () => {
+              const oldest = req.result.sort((a, b) => a.ts - b.ts).slice(0, overflow);
+              for (const item of oldest) store.delete(item.id);
+            };
           };
           tx.oncomplete = () => resolve();
           tx.onerror = () => reject(tx.error);
@@ -1037,9 +1146,8 @@
       }
     };
 
-    const H = s => { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0 } return Math.abs(h).toString(36).padStart(8, '0').slice(0, 8) };
     let nid = null;
-    const log = (action, detail = '') => DB.addHistory(action, detail);
+    const log = (action, detail = '') => DB.addHistory(action, detail).catch(() => {});
 
     // Minimal QR Code generator — fully client-side, no external requests.
     // Based on the public-domain qrcodejs algorithm (MIT).
@@ -1252,23 +1360,40 @@
         gen(text, sz = 220) {
           const cv = document.getElementById('qv');
           const cx = cv.getContext('2d');
-          cv.width = sz; cv.height = sz;
-          cx.fillStyle = '#fff';
-          cx.fillRect(0, 0, sz, sz);
+          const dpr = Math.min(window.devicePixelRatio || 1, 3);
           const matrix = encode(text);
           if (!matrix) {
+            cv.width = sz * dpr; cv.height = sz * dpr;
+            cv.style.width = sz + 'px'; cv.style.height = sz + 'px';
+            cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            cx.fillStyle = '#fff';
+            cx.fillRect(0, 0, sz, sz);
             cx.fillStyle = '#000';
             cx.font = '12px monospace';
             cx.textAlign = 'center';
+            cx.textBaseline = 'middle';
             cx.fillText('URL too long', sz / 2, sz / 2);
             return cv;
           }
           const n = matrix.length;
-          const pad = Math.floor(sz * 0.05);
-          const cell = (sz - pad * 2) / n;
+          // Integer cell size for crisp rendering.
+          const cell = Math.max(1, Math.floor((sz - 12) / n));
+          const gridSize = cell * n;
+          const pad = Math.floor((sz - gridSize) / 2);
+          const pxSize = gridSize + pad * 2;
+          cv.width = pxSize * dpr;
+          cv.height = pxSize * dpr;
+          cv.style.width = pxSize + 'px';
+          cv.style.height = pxSize + 'px';
+          cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          cx.fillStyle = '#fff';
+          cx.fillRect(0, 0, pxSize, pxSize);
           cx.fillStyle = '#000';
-          for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-            if (matrix[r][c] & 1) cx.fillRect(pad + c * cell, pad + r * cell, cell, cell);
+          for (let r = 0; r < n; r++) {
+            const row = matrix[r];
+            for (let c = 0; c < n; c++) {
+              if (row[c] & 1) cx.fillRect(pad + c * cell, pad + r * cell, cell, cell);
+            }
           }
           return cv;
         }
@@ -1286,8 +1411,9 @@
     const chars = $('chars'), words = $('words'), lines = $('lines');
 
     let ie = false, nd = false, pa = null, sv = 0;
-    let fontSize = parseInt(localStorage.getItem('fontSize') || '16');
-    let theme = localStorage.getItem('theme') || 'dark';
+    const parsedFont = parseInt(safeStorage.get('fontSize', '16'), 10);
+    let fontSize = Number.isFinite(parsedFont) ? Math.min(24, Math.max(12, parsedFont)) : 16;
+    let theme = safeStorage.get('theme', 'dark') === 'light' ? 'light' : 'dark';
 
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
@@ -1295,55 +1421,131 @@
     }
     document.documentElement.style.setProperty('--font-size', fontSize + 'px');
 
-    const msg = (m, d = 2000) => { st.textContent = m; st.classList.add('v'); setTimeout(() => st.classList.remove('v'), d) };
+    let msgTimer;
+    const msg = (m, d = 2000) => {
+      clearTimeout(msgTimer);
+      st.textContent = m;
+      st.classList.add('v');
+      msgTimer = setTimeout(() => st.classList.remove('v'), d);
+    };
+
+    const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusReturns = new WeakMap();
+    const getFocusable = container => Array.from(container.querySelectorAll(FOCUSABLE)).filter(el => !el.hasAttribute('aria-hidden') && el.offsetParent !== null);
+    const openModal = (modal, initial) => {
+      focusReturns.set(modal, document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      modal.classList.add('v');
+      const target = initial || getFocusable(modal)[0];
+      if (target && typeof target.focus === 'function') target.focus();
+    };
+    const closeModal = modal => {
+      modal.classList.remove('v');
+      const prev = focusReturns.get(modal);
+      focusReturns.delete(modal);
+      if (prev && document.body.contains(prev)) prev.focus();
+      else e.focus();
+    };
+    const trapFocus = modal => ev => {
+      if (ev.key !== 'Tab' || !modal.classList.contains('v')) return;
+      const nodes = getFocusable(modal);
+      if (nodes.length === 0) return;
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+    };
     const fz = b => b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : b >= 1024 ? (b / 1024).toFixed(1) + 'KB' : b + 'B';
     const bsz = s => new Blob([s]).size;
     const ut = t => { const m = t.match(/^#\s*(.+)/m); document.title = m ? m[1].slice(0, 50) : 'Runic Notes' };
 
     let statsTimer;
+    const countWords = t => {
+      let count = 0;
+      let inWord = false;
+      for (let i = 0; i < t.length; i++) {
+        const code = t.charCodeAt(i);
+        const isSpace = code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || code === 11 || code === 0xA0;
+        if (!isSpace) {
+          if (!inWord) { count++; inWord = true; }
+        } else inWord = false;
+      }
+      return count;
+    };
+    const countLines = t => {
+      let n = 1;
+      for (let i = 0; i < t.length; i++) if (t.charCodeAt(i) === 10) n++;
+      return n;
+    };
     const updateStats = () => {
       clearTimeout(statsTimer);
       statsTimer = setTimeout(() => {
         const t = e.value;
-        const c = t.length;
-        const wc = t.trim() ? t.trim().split(/\s+/).length : 0;
-        const l = t.split('\n').length;
-        chars.textContent = c + ' chars';
-        words.textContent = wc + ' words';
-        lines.textContent = l + ' lines';
-      }, 100);
+        chars.textContent = t.length + ' chars';
+        words.textContent = countWords(t) + ' words';
+        lines.textContent = countLines(t) + ' lines';
+      }, 120);
     };
 
+    const LOCK_ICON_ON = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+    const LOCK_ICON_OFF = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>';
     const ue = () => {
-      if (nd) { enc.classList.add('v'); e.style.paddingTop = 'calc(1.5rem + 36px)'; e.disabled = true; e.placeholder = 'Enter password...'; e.setAttribute('aria-disabled', 'true') }
-      else { enc.classList.remove('v'); e.style.paddingTop = '1.5rem'; e.disabled = false; e.placeholder = 'Start typing...'; e.removeAttribute('aria-disabled') }
+      enc.classList.toggle('v', nd);
+      e.classList.toggle('locked', nd);
+      e.disabled = nd;
+      e.placeholder = nd ? 'Enter password...' : 'Start typing...';
+      if (nd) e.setAttribute('aria-disabled', 'true');
+      else e.removeAttribute('aria-disabled');
       const li = $('li');
-      if (ie) { li.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'; bl.setAttribute('data-t', 'Remove encryption'); bl.setAttribute('aria-label', 'Remove encryption') }
-      else { li.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'; bl.setAttribute('data-t', 'Encrypt'); bl.setAttribute('aria-label', 'Encrypt') }
+      li.innerHTML = ie ? LOCK_ICON_ON : LOCK_ICON_OFF;
+      bl.setAttribute('data-t', ie ? 'Remove encryption' : 'Encrypt');
+      bl.setAttribute('aria-label', ie ? 'Remove encryption' : 'Encrypt');
       bl.classList.toggle('on', ie);
     };
 
     const save = () => {
       if (nd) return;
       const go = async () => {
-        const t = e.value, v = ++sv;
+        const t = e.value;
+        const v = ++sv;
         ut(t);
-        if (!t) { history.replaceState(null, '', location.pathname); ie = false; nid = null; ue(); return }
+        if (!t) {
+          history.replaceState(null, '', location.pathname);
+          ie = false;
+          nid = null;
+          ue();
+          return;
+        }
         if (ie && location.hash.startsWith('#!')) return;
         const c = await LZ.compress(t);
         if (v !== sv) return;
-        const b = bsz(t), ln = t.split('\n').length, ls = ln === 1 ? ' line' : ' lines';
+        if (!c) {
+          msg('Compression failed');
+          return;
+        }
+        const b = bsz(t);
+        const ln = t.split('\n').length;
+        const ls = ln === 1 ? ' line' : ' lines';
         if (c.length < 2000) {
           history.replaceState(null, '', '#' + c);
-          nid = null; msg(fz(b) + ' · ' + ln + ls);
-        } else {
-          if (!nid) nid = H(t.slice(0, 500) + t.length);
-          await DB.set(nid, { text: t, ts: Date.now() });
-          history.replaceState(null, '', '#@' + nid);
-          msg(fz(b) + ' · local');
+          nid = null;
+          msg(fz(b) + ' · ' + ln + ls);
+          return;
         }
+        if (!nid) nid = randomId();
+        try {
+          await DB.set(nid, { text: t, ts: Date.now() });
+        } catch {
+          msg('Local storage write failed');
+          return;
+        }
+        if (v !== sv) return;
+        history.replaceState(null, '', '#@' + nid);
+        msg(fz(b) + ' · local');
       };
-      window.requestIdleCallback ? requestIdleCallback(() => go(), { timeout: 500 }) : setTimeout(go, 150);
+      if (typeof window.requestIdleCallback === 'function') {
+        requestIdleCallback(go, { timeout: 500 });
+      } else {
+        setTimeout(go, 150);
+      }
     };
 
     const load = async () => {
@@ -1384,16 +1586,31 @@
       if (await cp(url)) { msg('Copied · ' + fz(bsz(url))); log('copy', fz(bsz(url))); } else msg('Copy failed');
     };
 
+    const sanitizeFileName = raw => {
+      const name = (raw || '')
+        .normalize('NFKD')
+        .replace(/[\u0000-\u001f\u007f/\\?%*:|"<>]/g, '-')
+        .replace(/^\.+/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 64);
+      return name || 'note';
+    };
+
     const download = () => {
       const t = e.value;
       if (!t) { msg('Nothing to download'); return }
-      const title = t.match(/^#\s*(.+)/m)?.[1]?.replace(/[^a-zA-Z0-9]/g, '-') || 'note';
-      const blob = new Blob([t], { type: 'text/plain' });
+      const title = sanitizeFileName(t.match(/^#\s*(.+)/m)?.[1]);
+      const blob = new Blob([t], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = title + '.txt';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       msg('Downloaded');
       log('download', title + '.txt');
     };
@@ -1414,23 +1631,71 @@
       }
     };
 
-    const pDec = () => { pa = 'decrypt'; pt.textContent = 'Enter decryption password'; pw2w.style.display = 'none'; pm.classList.add('v'); pw.focus() };
+    const pDec = () => {
+      pa = 'decrypt';
+      pt.textContent = 'Enter decryption password';
+      pw2w.style.display = 'none';
+      pw.setAttribute('autocomplete', 'current-password');
+      pw2.setAttribute('autocomplete', 'new-password');
+      openModal(pm, pw);
+    };
     const hEnc = async () => {
       if (nd) { pDec(); return }
       if (ie) { ie = false; ue(); save(); msg('Encryption removed'); return }
       if (!e.value) { msg('Nothing to encrypt'); return }
-      pa = 'encrypt'; pt.textContent = 'Enter encryption password'; pw2w.style.display = 'block'; pm.classList.add('v'); pw.focus();
+      pa = 'encrypt';
+      pt.textContent = 'Enter encryption password';
+      pw2w.style.display = 'block';
+      pw.setAttribute('autocomplete', 'new-password');
+      pw2.setAttribute('autocomplete', 'new-password');
+      openModal(pm, pw);
+    };
+    const clearPasswordFields = () => {
+      pw.value = '';
+      pw2.value = '';
+      if (pw.type === 'text') togglePw(pw, pwt);
+      if (pw2.type === 'text') togglePw(pw2, pw2t);
     };
     const hOk = async () => {
-      const p = pw.value; if (!p) return;
-      if (pa === 'encrypt' && pw.value !== pw2.value) { msg('Passwords do not match'); pw2.focus(); return }
+      const p = pw.value;
+      if (!p) { pw.focus(); return }
+      if (pa === 'encrypt') {
+        if (pw.value !== pw2.value) { msg('Passwords do not match'); pw2.focus(); return }
+        if (p.length < 8) { msg('Password must be at least 8 characters'); pw.focus(); return }
+      }
       try {
-        if (pa === 'encrypt') { const x = await Cr.encrypt(e.value, p); history.replaceState(null, '', '#!' + x); ie = true; nd = false; nid = null; ue(); msg('Encrypted · ' + fz(bsz(x))); log('encrypt', fz(bsz(x))); }
-        else if (pa === 'decrypt') { const d = location.hash.slice(2), t = await Cr.decrypt(d, p); if (t) { e.value = t; ut(t); ie = false; nd = false; ue(); save(); msg('Decrypted · ' + fz(bsz(t))); log('decrypt', fz(bsz(t))); e.focus() } else { msg('Wrong password'); pw.value = ''; pw.focus(); return } }
-      } catch { msg('Encryption error. Please try again.'); return }
-      pm.classList.remove('v'); pw.value = ''; pw2.value = ''; pa = null;
+        if (pa === 'encrypt') {
+          const x = await Cr.encrypt(e.value, p);
+          history.replaceState(null, '', '#!' + x);
+          ie = true; nd = false; nid = null;
+          ue();
+          msg('Encrypted · ' + fz(bsz(x)));
+          log('encrypt', fz(bsz(x)));
+        } else if (pa === 'decrypt') {
+          const d = location.hash.slice(2);
+          const t = await Cr.decrypt(d, p);
+          if (t === null) { msg('Wrong password'); pw.value = ''; pw.focus(); return }
+          e.value = t; ut(t);
+          ie = false; nd = false;
+          ue(); save();
+          msg('Decrypted · ' + fz(bsz(t)));
+          log('decrypt', fz(bsz(t)));
+          e.focus();
+        }
+      } catch {
+        msg('Encryption error. Please try again.');
+        return;
+      }
+      closeModal(pm);
+      clearPasswordFields();
+      pa = null;
     };
-    const cMod = () => { pm.classList.remove('v'); pw.value = ''; pw2.value = ''; pa = null; if (!nd) e.focus() };
+    const cMod = () => {
+      closeModal(pm);
+      clearPasswordFields();
+      pa = null;
+      if (nd) $('bd').focus();
+    };
 
     const togglePw = (input, btn) => {
       const isPassword = input.type === 'password';
@@ -1442,21 +1707,61 @@
     pwt.addEventListener('click', () => togglePw(pw, pwt));
     pw2t.addEventListener('click', () => togglePw(pw2, pw2t));
 
-    const newN = () => { if (e.value) { cm.classList.add('v'); co.focus(); return } mkNew() };
-    const mkNew = () => { e.value = ''; ie = false; nd = false; nid = null; history.replaceState(null, '', location.pathname); ue(); ut(''); cm.classList.remove('v'); e.focus(); updateStats(); msg('New note'); log('new'); };
-    const cCM = () => { cm.classList.remove('v'); e.focus() };
+    const newN = () => {
+      if (e.value || nd) { openModal(cm, cc); return }
+      mkNew();
+    };
+    const mkNew = () => {
+      e.value = '';
+      ie = false; nd = false; nid = null;
+      history.replaceState(null, '', location.pathname);
+      ue(); ut('');
+      closeModal(cm);
+      e.focus();
+      updateStats();
+      msg('New note');
+      log('new');
+    };
+    const cCM = () => closeModal(cm);
 
     const shQr = async () => {
-      const t = e.value; if (!t) { msg('Nothing to share'); return }
-      let url; if (ie && !nd) url = location.origin + location.pathname + location.hash; else { const c = await LZ.compress(t); url = location.origin + location.pathname + '#' + c }
+      const t = e.value;
+      if (!t) { msg('Nothing to share'); return }
+      let url;
+      if (ie && !nd) url = location.origin + location.pathname + location.hash;
+      else {
+        const c = await LZ.compress(t);
+        if (!c) { msg('Failed to compress note'); return }
+        url = location.origin + location.pathname + '#' + c;
+      }
       if (url.length > 2000) { msg('URL too long for QR'); return }
-      qu.textContent = url.length > 60 ? url.slice(0, 60) + '...' : url; QR.gen(url, 220); qm.classList.add('v');
+      qu.textContent = url.length > 60 ? url.slice(0, 60) + '…' : url;
+      QR.gen(url, 220);
+      openModal(qm, qx);
       log('qr');
     };
-    const dlQr = () => { const cv = $('qv'), a = document.createElement('a'); a.download = 'runic-note-qr.png'; a.href = cv.toDataURL('image/png'); a.click() };
-    const cQM = () => { qm.classList.remove('v'); e.focus() };
+    const dlQr = () => {
+      const cv = $('qv');
+      cv.toBlob(blob => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.download = 'runic-note-qr.png';
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, 'image/png');
+    };
+    const cQM = () => closeModal(qm);
 
-    const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escHtml = s => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
     const fmtTime = ts => {
       const d = new Date(ts), now = new Date();
       const diff = (now - d) / 1000;
@@ -1490,32 +1795,52 @@
       'share': 'Note shared',
       'load': 'Note loaded'
     };
-    const showHistory = async () => {
-      const items = await DB.getHistory();
-      if (items.length === 0) {
-        hl.innerHTML = '<div class="hi-empty">No activity yet</div>';
-      } else {
-        hl.innerHTML = items.map(i => {
-          const ai = actionIcons[i.action] || actionIcons['save'];
-          return `
-          <div class="hi">
-            <div class="hi-icon ${ai.color}">${ai.icon}</div>
-            <div class="hi-text">
-              <div class="hi-action">${escHtml(actionLabels[i.action] || i.action)}</div>
-              ${i.detail ? `<div class="hi-detail">${escHtml(i.detail)}</div>` : ''}
-            </div>
-            <div class="hi-time">${fmtTime(i.ts)}</div>
-          </div>
-        `}).join('');
+    const renderHistory = items => {
+      if (!items.length) {
+        hl.textContent = '';
+        const empty = document.createElement('div');
+        empty.className = 'hi-empty';
+        empty.textContent = 'No activity yet';
+        hl.appendChild(empty);
+        return;
       }
-      hm.classList.add('v');
+      const frag = document.createDocumentFragment();
+      for (const item of items) {
+        const ai = actionIcons[item.action] || actionIcons.save;
+        const row = document.createElement('div');
+        row.className = 'hi';
+        const safeColor = /^[a-z]*$/i.test(ai.color || '') ? (ai.color || '') : '';
+        row.innerHTML = `
+          <div class="hi-icon ${safeColor}">${ai.icon}</div>
+          <div class="hi-text">
+            <div class="hi-action">${escHtml(actionLabels[item.action] || item.action)}</div>
+            ${item.detail ? `<div class="hi-detail">${escHtml(item.detail)}</div>` : ''}
+          </div>
+          <div class="hi-time">${escHtml(fmtTime(item.ts))}</div>`;
+        frag.appendChild(row);
+      }
+      hl.textContent = '';
+      hl.appendChild(frag);
     };
-    hcl.addEventListener('click', async () => { await DB.clearHistory(); showHistory(); });
-    hx.addEventListener('click', () => { hm.classList.remove('v'); e.focus() });
+
+    const showHistory = async () => {
+      try {
+        const items = await DB.getHistory();
+        renderHistory(items);
+      } catch {
+        renderHistory([]);
+      }
+      openModal(hm, hx);
+    };
+    hcl.addEventListener('click', async () => {
+      try { await DB.clearHistory(); } catch {}
+      try { renderHistory(await DB.getHistory()); } catch { renderHistory([]); }
+    });
+    hx.addEventListener('click', () => closeModal(hm));
 
     const toggleTheme = () => {
       theme = theme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', theme);
+      safeStorage.set('theme', theme);
       if (theme === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
         $('theme-color-meta').content = '#ffffff';
@@ -1528,36 +1853,57 @@
 
     const changeFontSize = (delta) => {
       fontSize = Math.max(12, Math.min(24, fontSize + delta));
-      localStorage.setItem('fontSize', fontSize);
+      safeStorage.set('fontSize', String(fontSize));
       document.documentElement.style.setProperty('--font-size', fontSize + 'px');
     };
     bfs.addEventListener('click', () => changeFontSize(-2));
     bfl.addEventListener('click', () => changeFontSize(2));
 
-    const handleDrag = (ev) => {
+    const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+    let dragDepth = 0;
+    const handleDragEnter = ev => {
+      if (!ev.dataTransfer || !Array.from(ev.dataTransfer.types || []).includes('Files')) return;
       ev.preventDefault();
+      dragDepth++;
       dropzone.classList.add('v');
     };
-    const handleDragLeave = () => {
-      dropzone.classList.remove('v');
-    };
-    const handleDrop = async (ev) => {
+    const handleDragOver = ev => {
+      if (!ev.dataTransfer || !Array.from(ev.dataTransfer.types || []).includes('Files')) return;
       ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'copy';
+    };
+    const handleDragLeave = () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) dropzone.classList.remove('v');
+    };
+    const handleDrop = async ev => {
+      ev.preventDefault();
+      dragDepth = 0;
       dropzone.classList.remove('v');
-      const file = ev.dataTransfer.files[0];
-      if (!file || !file.name.endsWith('.txt')) {
+      const file = ev.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (!/\.txt$/i.test(file.name) && file.type && !file.type.startsWith('text/')) {
         msg('Only .txt files supported');
         return;
       }
-      const text = await file.text();
-      e.value = text;
-      ut(text);
-      updateStats();
-      save();
-      msg('Imported ' + file.name);
-      log('import', file.name);
+      if (file.size > MAX_IMPORT_BYTES) {
+        msg('File too large (>10MB)');
+        return;
+      }
+      try {
+        const text = await file.text();
+        e.value = text;
+        ut(text);
+        updateStats();
+        save();
+        msg('Imported ' + sanitizeFileName(file.name));
+        log('import', sanitizeFileName(file.name));
+      } catch {
+        msg('Failed to read file');
+      }
     };
-    document.addEventListener('dragover', handleDrag);
+    document.addEventListener('dragenter', handleDragEnter);
+    document.addEventListener('dragover', handleDragOver);
     document.addEventListener('dragleave', handleDragLeave);
     document.addEventListener('drop', handleDrop);
 
@@ -1585,16 +1931,21 @@
     cc.addEventListener('click', cCM);
     co.addEventListener('click', mkNew);
 
+    const modalTrap = trapFocus;
+    [pm, qm, cm, hm].forEach(modal => modal.addEventListener('keydown', modalTrap(modal)));
+
     document.addEventListener('keydown', x => {
       if (x.key === 'Escape') {
-        if (pm.classList.contains('v')) cMod();
-        else if (qm.classList.contains('v')) cQM();
-        else if (cm.classList.contains('v')) cCM();
-        else if (hm.classList.contains('v')) { hm.classList.remove('v'); e.focus() }
+        if (pm.classList.contains('v')) { cMod(); return; }
+        if (qm.classList.contains('v')) { cQM(); return; }
+        if (cm.classList.contains('v')) { cCM(); return; }
+        if (hm.classList.contains('v')) { closeModal(hm); return; }
       }
-      if ((x.metaKey || x.ctrlKey) && x.key === 'n') { x.preventDefault(); newN() }
-      if ((x.metaKey || x.ctrlKey) && x.shiftKey && x.key === 'c') { x.preventDefault(); cpUrl() }
-      if ((x.metaKey || x.ctrlKey) && x.key === 's') { x.preventDefault(); download() }
+      if (!(x.metaKey || x.ctrlKey)) return;
+      const k = x.key.toLowerCase();
+      if (k === 'n') { x.preventDefault(); newN(); }
+      else if (k === 'c' && x.shiftKey) { x.preventDefault(); cpUrl(); }
+      else if (k === 's' && !x.shiftKey) { x.preventDefault(); download(); }
     });
 
     load();
