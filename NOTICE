@@ -1,0 +1,12 @@
+# Runic Notes
+Copyright (c) 2026 undefined-art
+
+This product includes third-party software that is distributed under their
+respective licenses. Principal components:
+
+- Web Crypto API — provided by the browser (AES-256-GCM, PBKDF2)
+- IndexedDB — provided by the browser
+- QR code rendering — MIT/BSD licensed libraries as bundled
+
+For the complete and authoritative license texts, refer to the individual
+libraries and the browser vendor documentation.
